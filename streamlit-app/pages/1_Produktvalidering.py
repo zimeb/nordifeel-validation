@@ -636,25 +636,14 @@ VALID_BASE_NOTES_OPTIONS = parse_notes(BASE_NOTES_RAW)
 # """
 # VALID_TOP_NOTES_OPTIONS = parse_notes(RAW_TOP_NOTES)
 
-# Additional validation constants
-VALID_COUNTRIES = [
-    "Sweden", "SE", "Denmark", "DK", "Norway", "NO", "Finland", "FI",
-    "Germany", "DE", "France", "FR", "Italy", "IT", "Spain", "ES",
-    "United Kingdom", "UK", "Netherlands", "NL", "Belgium", "BE",
-    "USA", "US", "China", "CN", "Japan", "JP", "Korea", "KR"
-]
-
 VALID_CURRENCIES = ["SEK", "NOK", "EUR", "DKK", "DK", "sek", "nok", "eur", "dkk", "dk"]
 VALID_UNITS = ["ml", "g", "pcs", "st", "set", "kit", "pack"]
 
 # Regular expression patterns for validation
-EAN_PATTERN = re.compile(r'^\d{8}$|^\d{13}$')
-PRICE_PATTERN = re.compile(r'^\d+([,.]\d{1,2})?$')
 DATE_PATTERN = re.compile(r'^\d{4}-\d{2}-\d{2}( \d{2}:\d{2}:\d{2})?$')
 NUMERIC_PATTERN = re.compile(r'^\d+$')
-DISCOUNT_PATTERN = re.compile(r'^\d+([,.]\d{1,2})?%?$')
 HEX_COLOR_PATTERN = re.compile(r'^#[0-9a-fA-F]{6}$')
-UN_NUMBER_PATTERN = re.compile(r'^[0-9]{4}$')
+UN_NUMBER_PATTERN = re.compile(r'^(UN)?[0-9,.\s]{1,6}$', re.IGNORECASE)
 
 # Function to check if a value is numeric
 def is_numeric(val):
