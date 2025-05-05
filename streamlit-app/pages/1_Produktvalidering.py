@@ -768,4 +768,6 @@ with st.sidebar:
         - **Trait** - Describes additional benefits (e.g., hydrating, volumizing). Supports filters and recommendation accuracy.
         - **Hair Type** - Used in recommendations and filters to guide the right product to the right user.
         - **Fragrance Family** - Improves discoverability in scent categories. Helps group similar products and refine recommendations.
-        - **Top/Heart/Base Notes** - Enhances discovery and storytelling for perfumes. Useful in detailed product pages and guided shopping."""
+        - **Top/Heart/Base Notes** - Enhances discovery and storytelling for perfumes. Useful in detailed product pages and guided shopping.""")
+
+        st.info("For more details, see the documentation from NordicFeel about product uploads.")
