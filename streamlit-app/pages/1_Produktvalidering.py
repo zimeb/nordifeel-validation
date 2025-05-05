@@ -629,10 +629,26 @@ VALID_TOP_NOTES_OPTIONS = parse_notes(TOP_NOTES_RAW)
 VALID_HEART_NOTES_OPTIONS = parse_notes(HEART_NOTES_RAW)
 VALID_BASE_NOTES_OPTIONS = parse_notes(BASE_NOTES_RAW)
 
+# For example:
+# RAW_TOP_NOTES = """Absint
+# Agave
+# ... (rest of notes)
+# """
+# VALID_TOP_NOTES_OPTIONS = parse_notes(RAW_TOP_NOTES)
+
+# Additional validation constants
+VALID_COUNTRIES = [
+    "Sweden", "SE", "Denmark", "DK", "Norway", "NO", "Finland", "FI",
+    "Germany", "DE", "France", "FR", "Italy", "IT", "Spain", "ES",
+    "United Kingdom", "UK", "Netherlands", "NL", "Belgium", "BE",
+    "USA", "US", "China", "CN", "Japan", "JP", "Korea", "KR"
+]
+
 VALID_CURRENCIES = ["SEK", "NOK", "EUR", "DKK", "DK", "sek", "nok", "eur", "dkk", "dk"]
 VALID_UNITS = ["ml", "g", "pcs", "st", "set", "kit", "pack"]
 
 # Regular expression patterns for validation
+EAN_PATTERN = re.compile(r'^\d{8}$|^\d{13}$')
 PRICE_PATTERN = re.compile(r'^\d+([,.]\d{1,2})?$')
 DATE_PATTERN = re.compile(r'^\d{4}-\d{2}-\d{2}( \d{2}:\d{2}:\d{2})?$')
 NUMERIC_PATTERN = re.compile(r'^\d+$')
@@ -766,4 +782,1265 @@ with st.sidebar:
         - **Top/Heart/Base Notes** - Enhances discovery and storytelling for perfumes. Useful in detailed product pages and guided shopping.
         """)
         
-        st.info("Upload an Excel file with product data for validation. The system checks that the information complies with NordicFeel's specifications for product uploads.")
+        st.info("Upload an Excel file with product data for validation. The system checks that the information complies with NordicFeel’s specifications for product uploads.")
+
+# File uploader
+uploaded_file = st.file_uploader("Upload Excel file (.xlsx)", type=["xlsx"])
+
+if uploaded_file:
+    try:
+        # Data loading and processing in tabs
+        tabs = st.tabs(["Validation", "Raw Data", "Statistics"])
+        
+        # Create a copy of the file to allow multiple reads
+        file_copy = BytesIO(uploaded_file.getvalue())
+        
+        # Try to find the right sheet name
+        sheet_names = pd.ExcelFile(file_copy).sheet_names
+        product_sheet_name = None
+        
+        # Look for possible product template sheets
+        possible_names = ["Products", "Product Template", "NordicFeel Product Template", "Template", "Youty Product Template"]
+        for name in sheet_names:
+            if any(possible in name for possible in possible_names):
+                product_sheet_name = name
+                break
+                
+        # If no matching name found, use the first sheet
+        if not product_sheet_name and sheet_names:
+            product_sheet_name = sheet_names[0]
+            
+        if not product_sheet_name:
+            st.error("Kunde inte hitta produktblad i Excel-filen")
+            st.stop()
+            
+        # Read the data from Excel
+        df = pd.read_excel(file_copy, sheet_name=product_sheet_name, header=None)
+        st.sidebar.info(f"Filen innehåller {len(sheet_names)} flikar: {', '.join(sheet_names)}")
+        st.sidebar.success(f"Använder flik: {product_sheet_name}")
+
+        # Extract headers from row 2 (index 1)
+        headers = df.iloc[1].tolist()
+        headers = [str(h).strip() if pd.notna(h) else f"Unnamed_{i}" for i, h in enumerate(headers)]
+        
+        # Deduplicate column headers
+        def deduplicate_columns(columns):
+            seen = {}
+            result = []
+            for col in columns:
+                if col not in seen:
+                    seen[col] = 0
+                    result.append(col)
+                else:
+                    seen[col] += 1
+                    result.append(f"{col}.{seen[col]}")
+            return result
+
+        # Keep the original order of columns
+        deduped_headers = deduplicate_columns(headers)
+        original_column_order = deduped_headers.copy()
+
+        # Determine where the actual data starts
+        # Usually row 4 (index 3) contains examples
+        # Look at row 5 (index 4) to decide if it's real data or not
+        first_data_row = df.iloc[4]
+        ean_candidate = str(first_data_row[headers.index("EAN")] if "EAN" in headers else "").strip()
+        
+        # If row 5 looks like example data, start from row 6 (index 5), otherwise from row 5 (index 4)
+        start_row = 5 if ean_candidate in ["0737052972268", "Example", "Exempel", ""] else 4
+
+        # Extract the data, set the headers
+        data = df.iloc[start_row:].copy()
+        data.columns = deduped_headers
+        
+        # Filter out rows with all empty or formula placeholder values
+        # Check for actual content (not just formulas)
+        def has_actual_content(row):
+            # Look at important columns to determine if this is a real data row
+            # EAN is mandatory, so if it's missing/empty it's not a real row
+            ean_col = "EAN"
+            if ean_col in row:
+                ean_value = str(row[ean_col]).strip()
+                if ean_value and not ean_value.startswith("=") and ean_value.lower() not in ["nan", "none", ""]:
+                    return True
+            return False
+        
+        # Filter rows with actual content
+        data = data[data.apply(has_actual_content, axis=1)]
+        data.reset_index(drop=True, inplace=True)
+
+        # Show raw data tab
+        with tabs[1]:  # Raw data tab
+            st.subheader("Rådata från Excel")
+            st.dataframe(data, use_container_width=True)
+
+        st.success(f"Filen laddades in – {len(data)} rader att kontrollera.")
+
+        # Prepare for validation
+        cell_issues = {}
+        summary_rows = []
+        styled_summary_data = []
+
+        # Validate each row
+        for idx, row in data.iterrows():
+            row_num = idx + start_row + 1
+            summary_row = {"Radnummer": row_num}
+            styled_row = {}
+            issue_count = 0
+
+            # Process all columns in the original order
+            for col in original_column_order:
+                val = str(row.get(col, "")).strip() if pd.notna(row.get(col, "")) else ""
+                
+                # Main Category validation
+                if col == "Main Category":
+                    if not val:
+                        cell_issues[(idx, col)] = "red"
+                        styled_row[col] = "❌ Fält saknas – välj huvudkategori"
+                        issue_count += 1
+                    elif val not in VALID_MAIN_CATEGORIES:
+                        cell_issues[(idx, col)] = "red"
+                        styled_row[col] = "❌ Ogiltig huvudkategori"
+                        issue_count += 1
+                    else:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = f"✅ {val}"
+
+                # Secondary Category validation
+                elif col == "Secondary Category":
+                    main_val = str(row.get("Main Category", "")).strip() if "Main Category" in row else ""
+                    
+                    if not val:
+                        cell_issues[(idx, col)] = "red"
+                        styled_row[col] = "❌ Välj en subkategori"
+                        issue_count += 1
+                    elif main_val in VALID_SECONDARY_CATEGORIES and val not in VALID_SECONDARY_CATEGORIES[main_val]:
+                        cell_issues[(idx, col)] = "yellow"
+                        styled_row[col] = "⚠️ Välj en existerande subkategori"
+                        issue_count += 1
+                    else:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = f"✅ {val}"
+
+                # Third Category validation
+                elif col == "Third Category":
+                    main_val = str(row.get("Main Category", "")).strip() if "Main Category" in row else ""
+                    
+                    if not val:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = "—"
+                    elif main_val in VALID_THIRD_CATEGORIES and val not in VALID_THIRD_CATEGORIES[main_val]:
+                        cell_issues[(idx, col)] = "yellow"
+                        styled_row[col] = "⚠️ Välj en existerande subkategori"
+                        issue_count += 1
+                    else:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = f"✅ {val}"
+                            
+                # Fourth Category validation
+                elif col == "Fourth Category":
+                    main_val = str(row.get("Main Category", "")).strip() if "Main Category" in row else ""
+                    
+                    if not val:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = "—"
+                    elif main_val in VALID_FOURTH_CATEGORIES and val not in VALID_FOURTH_CATEGORIES[main_val]:
+                        cell_issues[(idx, col)] = "yellow"
+                        styled_row[col] = "⚠️ Välj en existerande subkategori"
+                        issue_count += 1
+                    else:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = f"✅ {val}"
+
+                # EAN validation
+                elif col == "EAN":
+                    if not val:
+                        cell_issues[(idx, col)] = "red"
+                        styled_row[col] = "❌ EAN saknas"
+                        issue_count += 1
+                    elif not EAN_PATTERN.match(val):
+                        cell_issues[(idx, col)] = "red"
+                        styled_row[col] = "❌ EAN måste vara 8 eller 13 siffror"
+                        issue_count += 1
+                    else:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = f"✅ {val}"
+
+                # Vendor Item Number validation
+                elif col == "Vendor Item Number":
+                    cell_issues[(idx, col)] = "green"
+                    styled_row[col] = "—" if not val else f"✅ {val}"
+                
+                # If Relaunch, Enter Old EAN validation
+                elif "old ean" in col.lower():
+                    cell_issues[(idx, col)] = "green"
+                    styled_row[col] = "—" if not val else f"✅ {val}"
+                
+                # Limited Edition validation
+                elif "limited" in col.lower() or "limited edition" in col.lower():
+                    cell_issues[(idx, col)] = "green"
+                    styled_row[col] = "—" if not val else f"✅ {val}"
+                
+                # Launch Date validation
+                elif col == "Launch Date":
+                    if not val:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = "—"
+                    elif not is_valid_date(val):
+                        cell_issues[(idx, col)] = "yellow"
+                        styled_row[col] = "⚠️ Felaktigt datumformat, använd YYYY-MM-DD"
+                        issue_count += 1
+                    else:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = f"✅ {val}"
+                
+                # Purchasing Date validation
+                elif col == "Purchasing Date":
+                    if not val:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = "—"
+                    elif not is_valid_date(val):
+                        cell_issues[(idx, col)] = "yellow"
+                        styled_row[col] = "⚠️ Felaktigt datumformat, använd YYYY-MM-DD"
+                        issue_count += 1
+                    else:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = f"✅ {val}"
+
+                # Brand Name validation
+                elif col == "Brand Name":
+                    if not val:
+                        cell_issues[(idx, col)] = "red"
+                        styled_row[col] = "❌ Varumärke saknas"
+                        issue_count += 1
+                    else:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = f"✅ {val}"
+                        
+                # Product Name validation
+                elif col == "Product Name":
+                    brand_val = str(row.get("Brand Name", "")).strip() if "Brand Name" in row else ""
+                    
+                    if not val:
+                        cell_issues[(idx, col)] = "red"
+                        styled_row[col] = "❌ Produktnamn saknas"
+                        issue_count += 1
+                    else:
+                        issues = []
+                        # Check for capitalization in product name
+                        words = val.split()
+                        if any(w[0].islower() for w in words if w):
+                            issues.append("Alla ord ska börja med stor bokstav")
+                        
+                        # Check for brand name in product name
+                        if brand_val and brand_val.lower() in val.lower():
+                            issues.append("Produktnamn innehåller varumärke")
+                        
+                        # Check for abbreviations (simple check for short words with periods)
+                        if re.search(r'\b[A-Za-z]{1,2}\.\b', val):
+                            issues.append("Inga förkortningar")
+                        
+                        # Check for volume info
+                        if re.search(r'\d+\s*(ml|g|pcs)', val.lower()):
+                            issues.append("Volym ska inte anges här")
+                        
+                        if issues:
+                            cell_issues[(idx, col)] = "yellow"
+                            styled_row[col] = f"⚠️ {', '.join(issues)}"
+                            issue_count += 1
+                        else:
+                            cell_issues[(idx, col)] = "green"
+                            styled_row[col] = f"✅ {val}"
+
+                # Product Name 2 validation
+                elif col == "Product Name 2":
+                    if not val:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = "—"
+                    else:
+                        issues = []
+                        # Check for capitalization
+                        words = val.split()
+                        if any(w[0].islower() for w in words if w):
+                            issues.append("Alla ord ska börja med stor bokstav")
+                        
+                        # Check for abbreviations
+                        if re.search(r'\b[A-Za-z]{1,2}\.\b', val):
+                            issues.append("Inga förkortningar")
+                        
+                        # Check for volume info
+                        if re.search(r'\d+\s*(ml|g|pcs)', val.lower()):
+                            issues.append("Volym ska inte anges här")
+                        
+                        if issues:
+                            cell_issues[(idx, col)] = "yellow"
+                            styled_row[col] = f"⚠️ {', '.join(issues)}"
+                            issue_count += 1
+                        else:
+                            cell_issues[(idx, col)] = "green"
+                            styled_row[col] = f"✅ {val}"
+
+                # Size validation
+                elif col == "Size":
+                    if not val:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = "—"
+                    elif not is_numeric(val):
+                        cell_issues[(idx, col)] = "yellow"
+                        styled_row[col] = "⚠️ Storlek bör vara numerisk"
+                        issue_count += 1
+                    else:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = f"✅ {val}"
+
+                # Unit/Volume validation
+                elif col == "Unit/Volume":
+                    if not val:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = "—"
+                    elif val.lower() not in VALID_UNITS:
+                        cell_issues[(idx, col)] = "yellow"
+                        styled_row[col] = f"⚠️ Okänd enhet: {val}"
+                        issue_count += 1
+                    else:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = f"✅ {val}"
+
+                # Units validations (all can be empty)
+                elif col in ["Units (minimum)", "Units D-pack", "Units per pallet", "Units per pallet layer"]:
+                    if not val:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = "—"
+                    elif not is_numeric(val):
+                        cell_issues[(idx, col)] = "yellow"
+                        styled_row[col] = "⚠️ Bör vara numeriskt värde"
+                        issue_count += 1
+                    else:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = f"✅ {val}"
+                
+                # Package dimensions
+                elif col in ["Length of product package", "Width of product package", "Height of product package"]:
+                    if not val:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = "—"
+                    elif not is_numeric(val):
+                        cell_issues[(idx, col)] = "yellow"
+                        styled_row[col] = "⚠️ Bör vara numeriskt värde (cm)"
+                        issue_count += 1
+                    else:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = f"✅ {val}"
+                
+                # Weight validation
+                elif col == "Weight":
+                    if not val:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = "—"
+                    elif not is_numeric(val):
+                        cell_issues[(idx, col)] = "yellow"
+                        styled_row[col] = "⚠️ Bör vara numeriskt värde (gram)"
+                        issue_count += 1
+                    else:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = f"✅ {val}"
+
+                # Country of origin validation
+                elif col == "Country of origin":
+                    if not val:
+                        cell_issues[(idx, col)] = "red"
+                        styled_row[col] = "❌ Ursprungsland saknas"
+                        issue_count += 1
+                    elif val not in VALID_COUNTRIES:
+                        cell_issues[(idx, col)] = "yellow"
+                        styled_row[col] = "⚠️ Använd lands-kod eller fullständigt namn"
+                        issue_count += 1
+                    else:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = f"✅ {val}"
+                        
+                # Customs Code validation
+                elif "customs code" in col.lower() or "stat.no" in col.lower():
+                    cell_issues[(idx, col)] = "green"
+                    styled_row[col] = "—" if not val else f"✅ {val}"
+                
+                # Manufacturer Information validation
+                elif "manufacturer information" in col.lower():
+                    cell_issues[(idx, col)] = "green"
+                    styled_row[col] = "—" if not val else f"✅ {val}"
+                
+                # UN Number validation
+                elif col == "UN Number":
+                    if not val:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = "—"
+                    elif val.lower() in ["n/a", "na"]:
+                        cell_issues[(idx, col)] = "red"
+                        styled_row[col] = "❌ Ta bort 'N/A' eller 'NA', lämna fältet tomt istället"
+                        issue_count += 1
+                    elif not UN_NUMBER_PATTERN.match(val):
+                        cell_issues[(idx, col)] = "yellow"
+                        styled_row[col] = "⚠️ UN-nummer bör vara 4 siffror"
+                        issue_count += 1
+                    else:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = f"✅ {val}"
+                
+                # Flash-point validation
+                elif col == "Flash-point":
+                    if not val:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = "—"
+                    elif not is_numeric(val.replace("°C", "").replace("°", "").strip()):
+                        cell_issues[(idx, col)] = "yellow"
+                        styled_row[col] = "⚠️ Bör vara numeriskt värde i Celsius"
+                        issue_count += 1
+                    else:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = f"✅ {val}"
+
+                # Gross Price validation
+                elif col == "Gross Price":
+                    if not val:
+                        cell_issues[(idx, col)] = "red"
+                        styled_row[col] = "❌ Pris saknas"
+                        issue_count += 1
+                    elif not PRICE_PATTERN.match(val.replace(' ', '')):
+                        cell_issues[(idx, col)] = "yellow"
+                        styled_row[col] = "⚠️ Ogiltigt prisformat"
+                        issue_count += 1
+                    else:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = f"✅ {val}"
+
+                # Currency validation
+                elif col == "Currency":
+                    if not val:
+                        cell_issues[(idx, col)] = "red"
+                        styled_row[col] = "❌ Valuta saknas"
+                        issue_count += 1
+                    elif val.lower() not in VALID_CURRENCIES:
+                        cell_issues[(idx, col)] = "yellow"
+                        styled_row[col] = f"⚠️ Ogiltig valuta: {val}"
+                        issue_count += 1
+                    else:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = f"✅ {val}"
+                
+                # Discount validation
+                elif "discount" in col.lower():
+                    if not val:
+                        cell_issues[(idx, col)] = "red"
+                        styled_row[col] = "❌ Rabatt saknas"
+                        issue_count += 1
+                    elif not val.replace(",", ".").replace("%", "").strip().isdigit() and not is_numeric(val):
+                        cell_issues[(idx, col)] = "yellow"
+                        styled_row[col] = "⚠️ Ogiltigt rabattformat"
+                        issue_count += 1
+                    else:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = f"✅ {val}"
+                
+                # Net Purchasing Price validation
+                elif col == "Net Purchasing Price":
+                    if not val:
+                        cell_issues[(idx, col)] = "red"
+                        styled_row[col] = "❌ Nettopris saknas"
+                        issue_count += 1
+                    elif not PRICE_PATTERN.match(val.replace(' ', '')):
+                        cell_issues[(idx, col)] = "yellow"
+                        styled_row[col] = "⚠️ Ogiltigt prisformat"
+                        issue_count += 1
+                    else:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = f"✅ {val}"
+                
+                # Sales Margin validations
+                elif "sales margin %" in col.lower():
+                    if not val:
+                        cell_issues[(idx, col)] = "red"
+                        styled_row[col] = "❌ Vinstmarginal saknas"
+                        issue_count += 1
+                    elif not val.replace(",", ".").replace("%", "").strip().replace("-", "").isdigit() and not is_numeric(val):
+                        cell_issues[(idx, col)] = "yellow"
+                        styled_row[col] = "⚠️ Ogiltigt marginalformat"
+                        issue_count += 1
+                    else:
+                        # Check if margin is negative
+                        try:
+                            margin_value = float(val.replace(",", ".").replace("%", "").strip())
+                            if margin_value < 0:
+                                cell_issues[(idx, col)] = "red"
+                                styled_row[col] = f"❌ Negativ vinstmarginal: {val}"
+                                issue_count += 1
+                            else:
+                                cell_issues[(idx, col)] = "green"
+                                styled_row[col] = f"✅ {val}"
+                        except ValueError:
+                            cell_issues[(idx, col)] = "green"
+                            styled_row[col] = f"✅ {val}"
+                
+                elif "sales margin kr" in col.lower():
+                    if not val:
+                        cell_issues[(idx, col)] = "red"
+                        styled_row[col] = "❌ Vinstmarginal i kronor saknas"
+                        issue_count += 1
+                    elif not is_numeric(val.replace(' ', '')):
+                        cell_issues[(idx, col)] = "yellow"
+                        styled_row[col] = "⚠️ Ogiltigt beloppsformat"
+                        issue_count += 1
+                    else:
+                        # Check if margin is negative
+                        try:
+                            margin_value = float(val.replace(",", ".").replace(" ", "").strip())
+                            if margin_value < 0:
+                                cell_issues[(idx, col)] = "red"
+                                styled_row[col] = f"❌ Negativ vinstmarginal: {val}"
+                                issue_count += 1
+                            else:
+                                cell_issues[(idx, col)] = "green"
+                                styled_row[col] = f"✅ {val}"
+                        except ValueError:
+                            cell_issues[(idx, col)] = "green"
+                            styled_row[col] = f"✅ {val}"
+
+                # RRP SEK validation
+                elif col.upper() in ["RRP SEK", "REC SEK"]:
+                    if not val:
+                        cell_issues[(idx, col)] = "red"
+                        styled_row[col] = "❌ RRP SEK saknas"
+                        issue_count += 1
+                    elif not PRICE_PATTERN.match(val.replace(' ', '')):
+                        cell_issues[(idx, col)] = "yellow"
+                        styled_row[col] = "⚠️ Ogiltigt prisformat"
+                        issue_count += 1
+                    else:
+                        # Also check against Gross Price
+                        gross_col = "Gross Price"
+                        gross_val = str(row.get(gross_col, "")).strip() if gross_col in row else ""
+                        
+                        if gross_val and PRICE_PATTERN.match(gross_val.replace(' ', '')):
+                            try:
+                                gross_num = float(gross_val.replace(' ', '').replace(',', '.'))
+                                rec_num = float(val.replace(' ', '').replace(',', '.'))
+                                if gross_num > rec_num:
+                                    cell_issues[(idx, col)] = "yellow"
+                                    styled_row[col] = f"⚠️ Bruttopris ({gross_val}) högre än RRP ({val})"
+                                    issue_count += 1
+                                else:
+                                    cell_issues[(idx, col)] = "green"
+                                    styled_row[col] = f"✅ {val}"
+                            except ValueError:
+                                cell_issues[(idx, col)] = "green"
+                                styled_row[col] = f"✅ {val}"
+                        else:
+                            cell_issues[(idx, col)] = "green"
+                            styled_row[col] = f"✅ {val}"
+                
+                # RRP NOK validation
+                elif col.upper() in ["RRP NOK", "REC NOK"]:
+                    if not val:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = "—"
+                    elif not PRICE_PATTERN.match(val.replace(' ', '')):
+                        cell_issues[(idx, col)] = "yellow"
+                        styled_row[col] = "⚠️ Ogiltigt prisformat"
+                        issue_count += 1
+                    else:
+                        # Check if reasonable compared to RRP SEK
+                        rec_sek_col = "RRP SEK" if "RRP SEK" in row else "REC SEK"
+                        rec_sek_val = str(row.get(rec_sek_col, "")).strip() if rec_sek_col in row else ""
+                        
+                        if rec_sek_val and PRICE_PATTERN.match(rec_sek_val.replace(' ', '')):
+                            try:
+                                rec_sek_num = float(rec_sek_val.replace(' ', '').replace(',', '.'))
+                                rec_nok_num = float(val.replace(' ', '').replace(',', '.'))
+                                # NOK is typically around 0.9-1.1 times SEK
+                                if rec_nok_num < rec_sek_num * 0.8 or rec_nok_num > rec_sek_num * 1.2:
+                                    cell_issues[(idx, col)] = "yellow"
+                                    styled_row[col] = f"⚠️ RRP NOK ({val}) verkar avvika från RRP SEK ({rec_sek_val})"
+                                    issue_count += 1
+                                else:
+                                    cell_issues[(idx, col)] = "green"
+                                    styled_row[col] = f"✅ {val}"
+                            except ValueError:
+                                cell_issues[(idx, col)] = "green"
+                                styled_row[col] = f"✅ {val}"
+                        else:
+                            cell_issues[(idx, col)] = "green"
+                            styled_row[col] = f"✅ {val}"
+                
+                # RRP EUR validation
+                elif col.upper() in ["RRP EUR", "REK EUR"]:
+                    if not val:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = "—"
+                    elif not PRICE_PATTERN.match(val.replace(' ', '')):
+                        cell_issues[(idx, col)] = "yellow"
+                        styled_row[col] = "⚠️ Ogiltigt prisformat"
+                        issue_count += 1
+                    else:
+                        # Check if reasonable compared to RRP SEK
+                        rec_sek_col = "RRP SEK" if "RRP SEK" in row else "REC SEK"
+                        rec_sek_val = str(row.get(rec_sek_col, "")).strip() if rec_sek_col in row else ""
+                        
+                        if rec_sek_val and PRICE_PATTERN.match(rec_sek_val.replace(' ', '')):
+                            try:
+                                rec_sek_num = float(rec_sek_val.replace(' ', '').replace(',', '.'))
+                                rec_eur_num = float(val.replace(' ', '').replace(',', '.'))
+                                # EUR is typically around 0.08-0.1 times SEK
+                                if rec_eur_num < rec_sek_num * 0.07 or rec_eur_num > rec_sek_num * 0.12:
+                                    cell_issues[(idx, col)] = "yellow"
+                                    styled_row[col] = f"⚠️ RRP EUR ({val}) verkar avvika från RRP SEK ({rec_sek_val})"
+                                    issue_count += 1
+                                else:
+                                    cell_issues[(idx, col)] = "green"
+                                    styled_row[col] = f"✅ {val}"
+                            except ValueError:
+                                cell_issues[(idx, col)] = "green"
+                                styled_row[col] = f"✅ {val}"
+                        else:
+                            cell_issues[(idx, col)] = "green"
+                            styled_row[col] = f"✅ {val}"
+                
+                # RRP DKK validation
+                elif col.upper() in ["RRP DKK", "REK DK", "REK DKK"]:
+                    if not val:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = "—"
+                    elif not PRICE_PATTERN.match(val.replace(' ', '')):
+                        cell_issues[(idx, col)] = "yellow"
+                        styled_row[col] = "⚠️ Ogiltigt prisformat"
+                        issue_count += 1
+                    else:
+                        # Check if reasonable compared to RRP SEK
+                        rec_sek_col = "RRP SEK" if "RRP SEK" in row else "REC SEK"
+                        rec_sek_val = str(row.get(rec_sek_col, "")).strip() if rec_sek_col in row else ""
+                        
+                        if rec_sek_val and PRICE_PATTERN.match(rec_sek_val.replace(' ', '')):
+                            try:
+                                rec_sek_num = float(rec_sek_val.replace(' ', '').replace(',', '.'))
+                                rec_dk_num = float(val.replace(' ', '').replace(',', '.'))
+                                # DKK is typically around 1.3-1.5 times SEK
+                                if rec_dk_num < rec_sek_num * 1.2 or rec_dk_num > rec_sek_num * 1.6:
+                                    cell_issues[(idx, col)] = "yellow"
+                                    styled_row[col] = f"⚠️ RRP DKK ({val}) verkar avvika från RRP SEK ({rec_sek_val})"
+                                    issue_count += 1
+                                else:
+                                    cell_issues[(idx, col)] = "green"
+                                    styled_row[col] = f"✅ {val}"
+                            except ValueError:
+                                cell_issues[(idx, col)] = "green"
+                                styled_row[col] = f"✅ {val}"
+                        else:
+                            cell_issues[(idx, col)] = "green"
+                            styled_row[col] = f"✅ {val}"
+
+                # Giftset Value validation
+                elif "giftset value" in col.lower():
+                    if not val:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = "—"
+                    elif not PRICE_PATTERN.match(val.replace(' ', '')):
+                        cell_issues[(idx, col)] = "yellow"
+                        styled_row[col] = "⚠️ Ogiltigt prisformat"
+                        issue_count += 1
+                    else:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = f"✅ {val}"
+
+                # Product Descriptions and How To Use validations (can be empty)
+                elif any(text in col.lower() for text in ["product text", "how to use", "safety information"]):
+                    cell_issues[(idx, col)] = "green"
+                    styled_row[col] = "—" if not val else f"✅ Text finns"
+
+                # INCI validation
+                elif col == "INCI":
+                    cell_issues[(idx, col)] = "green"
+                    styled_row[col] = "—" if not val else f"✅ INCI finns"
+
+                # SEO Keywords validation
+                elif "seo keywords" in col.lower():
+                    cell_issues[(idx, col)] = "green"
+                    styled_row[col] = "—" if not val else f"✅ Nyckelord finns"
+
+                # Hex Color Code validation
+                elif "hex color" in col.lower() or "hex code" in col.lower():
+                    if not val:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = "—"
+                    elif not HEX_COLOR_PATTERN.match(val):
+                        cell_issues[(idx, col)] = "yellow"
+                        styled_row[col] = "⚠️ Ogiltigt hexformat (ska vara #RRGGBB)"
+                        issue_count += 1
+                    else:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = f"✅ {val}"
+
+                # Gender validation
+                elif col == "Gender":
+                    if not val:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = "—"
+                    elif val not in VALID_GENDER_OPTIONS:
+                        cell_issues[(idx, col)] = "yellow"
+                        styled_row[col] = f"⚠️ Ogiltigt kön: {val}"
+                        issue_count += 1
+                    else:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = f"✅ {val}"
+
+                # SPF validation
+                elif col == "SPF":
+                    if not val:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = "—"
+                    elif val not in VALID_SPF_OPTIONS:
+                        cell_issues[(idx, col)] = "yellow"
+                        styled_row[col] = f"⚠️ Ogiltigt SPF-värde: {val}"
+                        issue_count += 1
+                    else:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = f"✅ {val}"
+
+                # Color validation
+                elif col == "Color":
+                    if not val:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = "—"
+                    elif val not in VALID_COLOR_OPTIONS:
+                        cell_issues[(idx, col)] = "yellow"
+                        styled_row[col] = f"⚠️ Ogiltig färg: {val}"
+                        issue_count += 1
+                    else:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = f"✅ {val}"
+
+                # Finish validation
+                elif col == "Finish":
+                    if not val:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = "—"
+                    elif val not in VALID_FINISH_OPTIONS:
+                        cell_issues[(idx, col)] = "yellow"
+                        styled_row[col] = f"⚠️ Ogiltig finish: {val}"
+                        issue_count += 1
+                    else:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = f"✅ {val}"
+
+                # Coverage validation
+                elif col == "Coverage":
+                    if not val:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = "—"
+                    elif val not in VALID_COVERAGE_OPTIONS:
+                        cell_issues[(idx, col)] = "yellow"
+                        styled_row[col] = f"⚠️ Ogiltig täckning: {val}"
+                        issue_count += 1
+                    else:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = f"✅ {val}"
+
+                # Product Type validation
+                elif col == "Product Type":
+                    if not val:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = "—"
+                    elif val not in VALID_PRODUCT_TYPE_OPTIONS:
+                        cell_issues[(idx, col)] = "yellow"
+                        styled_row[col] = f"⚠️ Ogiltig produkttyp: {val}"
+                        issue_count += 1
+                    else:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = f"✅ {val}"
+
+                # Multi-select fields validation
+                elif col == "Sustainable Beauty":
+                    is_valid, invalid_values = validate_multi_select(val, VALID_SUSTAINABLE_BEAUTY_OPTIONS)
+                    if not val:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = "—"
+                    elif not is_valid:
+                        cell_issues[(idx, col)] = "yellow"
+                        styled_row[col] = f"⚠️ Ogiltiga värden: {', '.join(invalid_values)}"
+                        issue_count += 1
+                    else:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = f"✅ {val}"
+
+                elif col == "Active Ingredients":
+                    is_valid, invalid_values = validate_multi_select(val, VALID_ACTIVE_INGREDIENTS_OPTIONS)
+                    if not val:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = "—"
+                    elif not is_valid:
+                        cell_issues[(idx, col)] = "yellow"
+                        styled_row[col] = f"⚠️ Ogiltiga värden: {', '.join(invalid_values)}"
+                        issue_count += 1
+                    else:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = f"✅ {val}"
+
+                elif col == "Skin Type":
+                    is_valid, invalid_values = validate_multi_select(val, VALID_SKIN_TYPE_OPTIONS)
+                    if not val:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = "—"
+                    elif not is_valid:
+                        cell_issues[(idx, col)] = "yellow"
+                        styled_row[col] = f"⚠️ Ogiltiga värden: {', '.join(invalid_values)}"
+                        issue_count += 1
+                    else:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = f"✅ {val}"
+
+                elif col == "Skin Condition":
+                    is_valid, invalid_values = validate_multi_select(val, VALID_SKIN_CONDITION_OPTIONS)
+                    if not val:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = "—"
+                    elif not is_valid:
+                        cell_issues[(idx, col)] = "yellow"
+                        styled_row[col] = f"⚠️ Ogiltiga värden: {', '.join(invalid_values)}"
+                        issue_count += 1
+                    else:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = f"✅ {val}"
+
+                elif col == "Trait":
+                    is_valid, invalid_values = validate_multi_select(val, VALID_TRAIT_OPTIONS)
+                    if not val:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = "—"
+                    elif not is_valid:
+                        cell_issues[(idx, col)] = "yellow"
+                        styled_row[col] = f"⚠️ Ogiltiga värden: {', '.join(invalid_values)}"
+                        issue_count += 1
+                    else:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = f"✅ {val}"
+
+                elif col == "Hair Type":
+                    is_valid, invalid_values = validate_multi_select(val, VALID_HAIR_TYPE_OPTIONS)
+                    if not val:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = "—"
+                    elif not is_valid:
+                        cell_issues[(idx, col)] = "yellow"
+                        styled_row[col] = f"⚠️ Ogiltiga värden: {', '.join(invalid_values)}"
+                        issue_count += 1
+                    else:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = f"✅ {val}"
+
+                elif col == "Fragrance Family":
+                    is_valid, invalid_values = validate_multi_select(val, VALID_FRAGRANCE_FAMILY_OPTIONS)
+                    if not val:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = "—"
+                    elif not is_valid:
+                        cell_issues[(idx, col)] = "yellow"
+                        styled_row[col] = f"⚠️ Ogiltiga värden: {', '.join(invalid_values)}"
+                        issue_count += 1
+                    else:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = f"✅ {val}"
+
+                elif col == "Top Notes":
+                    is_valid, invalid_values = validate_multi_select(val, VALID_TOP_NOTES_OPTIONS)
+                    if not val:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = "—"
+                    elif not is_valid:
+                        cell_issues[(idx, col)] = "yellow"
+                        styled_row[col] = f"⚠️ Ogiltiga värden: {', '.join(invalid_values)}"
+                        issue_count += 1
+                    else:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = f"✅ {val}"
+
+                elif col == "Heart Notes":
+                    is_valid, invalid_values = validate_multi_select(val, VALID_HEART_NOTES_OPTIONS)
+                    if not val:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = "—"
+                    elif not is_valid:
+                        cell_issues[(idx, col)] = "yellow"
+                        styled_row[col] = f"⚠️ Ogiltiga värden: {', '.join(invalid_values)}"
+                        issue_count += 1
+                    else:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = f"✅ {val}"
+
+                elif col == "Base Notes":
+                    is_valid, invalid_values = validate_multi_select(val, VALID_BASE_NOTES_OPTIONS)
+                    if not val:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = "—"
+                    elif not is_valid:
+                        cell_issues[(idx, col)] = "yellow"
+                        styled_row[col] = f"⚠️ Ogiltiga värden: {', '.join(invalid_values)}"
+                        issue_count += 1
+                    else:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = f"✅ {val}"
+
+                # Default validation for all other fields (OK to leave empty)
+                else:
+                    if not val or val.lower() in ["nan", "none"] or pd.isna(val):
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = "—"
+                    else:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = f"✅ {val}"
+                
+            # Add summary information to the rows
+            summary_row["Antal problem"] = issue_count
+            summary_rows.append(summary_row)
+            styled_summary_data.append(styled_row)
+            
+        # Function to style the dataframe with color-coded cells
+        def style_dataframe(df):
+            def highlight_cell(val, row_idx, col_name):
+                color = cell_issues.get((row_idx, col_name))
+                if color == "red":
+                    return "background-color: #ffcccc"
+                elif color == "yellow":
+                    return "background-color: #fff3b0"
+                elif color == "green":
+                    return "background-color: #d4edda"
+                return ""
+                
+            return df.style.apply(
+                lambda row: [highlight_cell(row[col], row.name, col) for col in df.columns],
+                axis=1
+            )
+            
+        # Display validation results tab
+        with tabs[0]:  # Validation tab
+            st.write("📋 Validated product file with highlighted fields")
+            
+            # Always show all columns, regardless of show_all_columns setting
+            filtered_data = data
+            
+            # Create a styled dataframe with all issue highlights
+            styled_df = style_dataframe(filtered_data)
+            st.dataframe(styled_df, use_container_width=True, height=400)
+
+            st.divider()
+            st.write("🧾 Summary per row with status per column")
+
+            # Create summary dataframe
+            summary_df = pd.DataFrame(summary_rows)
+            summary_df.rename(columns={"Radnummer": "Row Number", "Antal problem": "Error Count"}, inplace=True)
+            
+            # Create the detailed dataframe with columns in the original order
+            detail_columns = original_column_order
+            
+            # Create new dict with ordered columns
+            ordered_summary_data = []
+            for row_data in styled_summary_data:
+                ordered_row = {}
+                for col in detail_columns:
+                    ordered_row[col] = row_data.get(col, "")
+                ordered_summary_data.append(ordered_row)
+            
+            detail_df = pd.DataFrame(ordered_summary_data)
+            
+            # Merge summary with detailed validation
+            merged = pd.concat([summary_df, detail_df], axis=1)
+            merged = merged.loc[:, ~merged.columns.duplicated()]
+            
+            # Apply filter based on sidebar selection
+            if filter_by == "Only with errors":
+                merged = merged[merged["Error Count"] > 0]
+            elif filter_by == "Only without errors":
+                merged = merged[merged["Error Count"] == 0] == "Endast med fel";
+                merged = merged[merged["Antal problem"] > 0]
+            elif filter_by == "Endast utan fel":
+                merged = merged[merged["Antal problem"] == 0]
+
+            # Style the summary table with appropriate colors
+            def style_summary(df):
+                def get_style(val):
+                    if isinstance(val, str):
+                        if val.startswith("✅"):
+                            return "background-color: #d4edda"
+                        elif val.startswith("⚠️"):
+                            return "background-color: #fff3b0"
+                        elif val.startswith("❌"):
+                            return "background-color: #f8d7da"
+                    return ""
+                return df.style.applymap(get_style)
+
+            st.dataframe(style_summary(merged), use_container_width=True, height=400)
+
+            # Add EAN list for easy copying
+            if "EAN" in data.columns:
+                st.divider()
+                st.subheader("📋 EAN List for Copying")
+                
+                # Get all EANs and display them
+                eans = data["EAN"].dropna().astype(str).tolist()
+                if eans:
+                    # Format as one EAN per line for easy copying
+                    ean_text = "\n".join(eans)
+                    st.code(ean_text, language=None)
+
+                else:
+                    st.info("No valid EAN codes found in the data.")
+
+            # Export options with more visible buttons
+            st.divider()
+            st.subheader("📊 Export Options")
+            col1, col2 = st.columns(2)
+            with col1:
+                csv = merged.to_csv(index=False).encode("utf-8")
+                st.download_button(
+                    "📥 Download Validation Report (CSV)",
+                    data=csv,
+                    file_name="validation_summary.csv",
+                    mime="text/csv",
+                    use_container_width=True
+                )
+            
+            with col2:
+                # Create Excel report with formatting
+                excel_buffer = BytesIO()
+                with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
+                    merged.to_excel(writer, index=False, sheet_name="Validation Report")
+                    # Could add Excel styling here with openpyxl if needed
+                
+                excel_buffer.seek(0)
+                st.download_button(
+                    "📥 Download as Excel Report",
+                    data=excel_buffer,
+                    file_name="validation_report.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True
+                )
+        
+        # Statistics tab
+        with tabs[2]:  # Statistics tab
+            st.subheader("Statistics and Data Analysis")
+            
+            # Calculate statistics
+            total_rows = len(data)
+            rows_with_issues = sum(1 for row in summary_rows if row["Antal problem"] > 0)
+            error_percentage = (rows_with_issues / total_rows * 100) if total_rows > 0 else 0
+            
+            # Display stats in metrics
+            col1, col2, col3 = st.columns(3)
+            col1.metric("Total Rows", total_rows)
+            col2.metric("Rows with Issues", rows_with_issues)
+            col3.metric("Error Percentage", f"{error_percentage:.1f}%")
+            
+            # Calculate category distributions
+            if "Main Category" in data.columns:
+                st.subheader("Category Distribution")
+                category_counts = data["Main Category"].value_counts()
+                st.bar_chart(category_counts)
+            
+            # Issue distribution by type
+            st.subheader("Most Common Issues")
+            issue_types = {}
+            for row in styled_summary_data:
+                for col, val in row.items():
+                    if val.startswith("❌") or val.startswith("⚠️"):
+                        issue_key = val.split("❌ ")[-1] if "❌ " in val else val.split("⚠️ ")[-1]
+                        issue_key = issue_key[:40] + "..." if len(issue_key) > 40 else issue_key
+                        issue_types.setdefault(issue_key, 0)
+                        issue_types[issue_key] += 1
+            
+            issue_df = pd.DataFrame({
+                "Issue": list(issue_types.keys()),
+                "Count": list(issue_types.values())
+            }).sort_values("Count", ascending=False)
+            
+            if not issue_df.empty:
+                if len(issue_df) > 10:
+                    issue_df = issue_df.head(10)
+                    st.info("Showing the 10 most common issues")
+                    
+                st.bar_chart(issue_df.set_index("Issue"))
+                
+                # Detailed issue table
+                st.subheader("Detailed Issue List")
+                st.dataframe(issue_df, use_container_width=True)
+            else:
+                st.success("No issues found in the file!")
+                
+            # Field completion statistics
+            st.subheader("Field Completion Rate")
+            
+            field_stats = {}
+            for col in data.columns:
+                non_empty = sum(1 for val in data[col] if pd.notna(val) and str(val).strip() not in ["", "nan", "none"])
+                completion_pct = (non_empty / total_rows * 100) if total_rows > 0 else 0
+                field_stats[col] = completion_pct
+                
+            field_stats_df = pd.DataFrame({
+                "Column": list(field_stats.keys()),
+                "Completion Rate (%)": list(field_stats.values())
+            }).sort_values("Completion Rate (%)", ascending=False)
+            
+            st.bar_chart(field_stats_df.set_index("Column"))
+            
+            # Field validation status
+            st.subheader("Validation Status per Column")
+            
+            field_validation = {}
+            for (idx, col), status in cell_issues.items():
+                field_validation.setdefault(col, {"green": 0, "yellow": 0, "red": 0})
+                field_validation[col][status] += 1
+                
+            # Convert to percentage
+            field_validation_pct = {}
+            for col, counts in field_validation.items():
+                total = sum(counts.values())
+                if total > 0:
+                    field_validation_pct[col] = {
+                        "Correct (%)": (counts["green"] / total * 100),
+                        "Warnings (%)": (counts["yellow"] / total * 100),
+                        "Errors (%)": (counts["red"] / total * 100)
+                    }
+                    
+            # Create a dataframe for visualization
+            validation_data = []
+            for col, stats in field_validation_pct.items():
+                validation_data.append({
+                    "Column": col,
+                    "Status": "Correct",
+                    "Percent": stats["Correct (%)"]
+                })
+                validation_data.append({
+                    "Column": col,
+                    "Status": "Warnings",
+                    "Percent": stats["Warnings (%)"]
+                })
+                validation_data.append({
+                    "Column": col,
+                    "Status": "Errors",
+                    "Percent": stats["Errors (%)"]
+                })
+                
+            validation_df = pd.DataFrame(validation_data)
+            
+            # Convert to a pivot table for visualization
+            pivot_df = validation_df.pivot(index="Column", columns="Status", values="Percent")
+            
+            # Ensure all columns exist
+            for col in ["Correct", "Warnings", "Errors"]:
+                if col not in pivot_df.columns:
+                    pivot_df[col] = 0
+                    
+            # Sort by error percentage
+            pivot_df = pivot_df.sort_values("Errors", ascending=False)
+            
+            # Display stacked bar chart
+            if not pivot_df.empty:
+                st.bar_chart(pivot_df)
+                
+    except Exception as e:
+        st.error(f"An error occurred: {e}")
+        if st.checkbox("Show detailed error information"):
+            st.exception(e)
+else:
+    st.info("Upload an Excel file to start validation.")
+    
+    # Show welcome message and instructions
+    st.markdown("""
+    ## Welcome to NordicFeel Product Validation
+    
+    This tool helps you validate product files for upload to NordicFeel. 
+    It checks that your Excel file has the correct format and that all necessary information is included.
+    
+    ### How to use the tool:
+    
+    1. Upload your Excel file with product data by clicking "Browse files" above
+    2. The system automatically analyzes your file and shows any errors or warnings
+    3. Fix the errors in your Excel file based on the feedback
+    4. You can download an error report to share with others
+    5. A list of all EAN codes is shown at the end for easy copying
+    
+    ### Color coding:
+    
+    - 🟢 **Green** - The information is correct
+    - 🟡 **Yellow** - Warning that must be corrected
+    - 🔴 **Red** - Error that must be fixed
+    """)
+    
+    # Display file structure requirements
+    with st.expander("📋 View Column Explanations", expanded=False):
+        st.markdown("""
+        ### Critical Columns (must be filled in)
+        
+        - **Main Category** - Helps customers find your product and increases visibility in filters and recommendations.
+        - **Secondary Category** - Same as above. Be as specific as possible, but only select what is truly relevant.
+        - **EAN** - 8 or 13 digits. Required to list and track the product in our systems.
+        - **Brand Name** - Displayed across site. Must be correct and final from the start.
+        - **Product Name** - This is the name customers will see on-site and in search results. It must be final and correctly formatted, as we publish exactly what you enter here — no internal corrections or adjustments are made. A clear, accurate name is essential for product presentation, customer trust, and overall sales performance.
+        - **Gross Price** - Base for pricing calculations and margin setup.
+        - **Currency** - Must match the pricing data you provide.
+        - **Discount (%)** - Used to calculate your net purchasing price.
+        - **Net Purchasing Price** - Calculated field (Gross Price - Discount).
+        - **Sales Margin %** - Calculated from price data.
+        - **Sales Margin KR** - Calculated from price data.
+        - **Country of origin** - Required for customs and legal compliance.
+        - **RRP SEK** - Customer-facing sales price. Displayed on site.
+        
+        ### Critical Columns (if applicable)
+        
+        - **If Relaunch, Enter Old EAN** - If this product is a renovation or replacement of an existing item, it's essential that you provide the previous EAN. This allows us to link the new product to the same article number and retain valuable data like historical sales, reviews, customer behavior, and order forecasts. Without this, the product is treated as completely new — which means our systems (and customers) have to "relearn" it from scratch, resulting in slower ramp-up and lost sales opportunities.
+        - **Launch Date** - Use if you want to control the product's go-live date. If left blank, the product will be launched immediately once in stock.
+        - **Purchasing Date** - If you want to control when we can start purchase the product. If left blank, we will purchase it immediately once registered.
+        - **UN Number** - Mandatory for hazardous goods. Supplier must provide this if relevant.
+        - **Flash-point** - Mandatory for hazardous goods. Supplier must provide this if relevant.
+        
+        ### Important Columns (but not critical)
+        
+        - **Third Category** - Improves product visibility and navigation on-site. Fill in to the extent possible as relevant.
+        - **Size** - Displayed in filters and on product pages (e.g. 30, 50, 100).
+        - **Unit/Volume** - Clarifies product size. Used with the number in "Size".
+        - **Length/Width/Height of product package** - Used for shipping and storage setup.
+        - **Weight** - Used for shipping and storage setup.
+        - **Customs Code / STAT.no** - Used for customs classification. We can add if missing.
+        - **Manufacturer Information** - Important (will become critical under EU law). Must be the GPSR-responsible company. Required for upcoming EU regulations.
+        - **Giftset Value SEK** - Important if applicable. Required for gift sets or value packs to reflect bundle value.
+        - **Product Text (all languages)** - Important but not critical at this stage. A good, descriptive product text increases customer trust and drives sales. Can be left empty at this stage if you will send it later or we can retrieve it from a supplier portal.
+        - **How To Use (all languages)** - Important but not critical at this stage. Helps customers use the product correctly, reduces returns, and builds brand trust. Can be left empty at this stage if you will send it later or we can retrieve it from a supplier portal.
+        - **Safety Information Use (all languages)** - Important (will become critical). Required for GPSR compliance.
+        - **INCI** - Critical for transparency and compliance. Can be left empty at this stage if you will send it later or we can retrieve it from a supplier portal.
+        
+        ### Optional Columns
+        
+        - **Fourth Category** - Adds filtering depth if relevant. Only fill in if it makes sense for the product.
+        - **Vendor Item Number** - Helps match SKUs across systems.
+        - **Product Name 2** - Useful for distinguishing between similar products, especially variants like shades, scents, or formats. Helps customers easily identify the right version and improves clarity on product pages. Do not include brand name or volume. Avoid abbreviations, and capitalize each word for consistency and readability.
+        - **Units (minimum/D-pack/per pallet/per pallet layer)** - Supports logistics and order planning.
+        - **RRP NOK/EUR/DKK** - We'll convert from SEK if left blank.
+        - **SEO Keywords** - Improves product discoverability in search and SEO.
+        - **Hex Color Code** - Helps visually match color cosmetics or packaging. Improves product filtering and visibility.
+        
+        ### Attribute Columns (recommended if relevant)
+        
+        These columns improve product discoverability, filtering, and recommendation precision:
+        
+        - **Gender** - Used in filters and helps us recommend the product more effectively to the right audience.
+        - **SPF** - Important for skincare and sun protection categories. Improves filtering and recommendation precision.
+        - **Color** - Displayed on product pages and filters. Helps customers compare and find matching shades.
+        - **Finish** - Relevant for makeup. Improves discoverability through filters and recommendations.
+        - **Coverage** - Used for foundations, concealers, and BB creams. Helps the right customers find the right level of coverage.
+        - **Product Type** - Supports site navigation, filters, and search. Improves product matching and cross-selling.
+        - **Sustainable Beauty** - Used in filters and badges to promote eco-conscious choices. Boosts visibility for customers who shop by values.
+        - **Active Ingredients** - Key for product discovery and trust. Helps us highlight benefits and connect to search terms like "Vitamin C" or "Retinol."
+        - **Skin Type** - Used in filters and recommendations. Helps customers find suitable products based on their skin needs.
+        - **Skin Condition** - Improves targeting for specific concerns (e.g., acne, dryness). Helps customers find the right solutions.
+        - **Trait** - Describes additional benefits (e.g., hydrating, volumizing). Supports filters and recommendation accuracy.
+        - **Hair Type** - Used in recommendations and filters to guide the right product to the right user.
+        - **Fragrance Family** - Improves discoverability in scent categories. Helps group similar products and refine recommendations.
+        - **Top/Heart/Base Notes** - Enhances discovery and storytelling for perfumes. Useful in detailed product pages and guided shopping.
+        """)
+
+        st.info("For more details, see the documentation from NordicFeel about product uploads.")
