@@ -1585,10 +1585,12 @@ if uploaded_file:
                     pass
     
         # Apply highlighting to the display dataframe
-        return display_df.style.apply(
+        styled = display_df.style.apply(
             lambda row: [highlight_cell(row[col], row.name, col) for col in df.columns],
             axis=1
         )
+
+        return styled
             
         # Display validation results tab
         with tabs[0]:  # Validation tab
