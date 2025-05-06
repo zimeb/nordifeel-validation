@@ -1579,10 +1579,15 @@ if uploaded_file:
                     format_dict[col] = '{:.2f}'
     
             # Apply both highlighting and formatting
-            return df.style.apply(
+            styled = df.style.apply(
                 lambda row: [highlight_cell(row[col], row.name, col) for col in df.columns],
                 axis=1
-            ).format(format_dict, na_rep="None")
+            )
+            try:
+                return styled.format(format_dict, na_rep="None")
+            except:
+                # If formatting fails, return without formatting
+                return styled
             
         # Display validation results tab
         with tabs[0]:  # Validation tab
