@@ -1133,10 +1133,11 @@ if uploaded_file:
                 
                 # Manufacturer Information validation
                 elif "manufacturer information" in col.lower():
+                    invalid_values = ["na", "n/a", "not assigned", "nr"]
                     if not val:
                         cell_issues[(idx, col)] = "green"
                         styled_row[col] = "—"
-                    elif INVALID_MANUFACTURER_PATTERN.match(val):
+                    elif val.strip().lower() in invalid_values or val.strip().upper().startswith("UN"):
                         cell_issues[(idx, col)] = "red"
                         styled_row[col] = "❌ Lägg till korrekt tillverkare eller lämna fältet tomt"
                         issue_count += 1
