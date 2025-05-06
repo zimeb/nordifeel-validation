@@ -629,32 +629,15 @@ VALID_TOP_NOTES_OPTIONS = parse_notes(TOP_NOTES_RAW)
 VALID_HEART_NOTES_OPTIONS = parse_notes(HEART_NOTES_RAW)
 VALID_BASE_NOTES_OPTIONS = parse_notes(BASE_NOTES_RAW)
 
-# For example:
-# RAW_TOP_NOTES = """Absint
-# Agave
-# ... (rest of notes)
-# """
-# VALID_TOP_NOTES_OPTIONS = parse_notes(RAW_TOP_NOTES)
-
 # Additional validation constants
-VALID_COUNTRIES = [
-    "Sweden", "SE", "Denmark", "DK", "Norway", "NO", "Finland", "FI",
-    "Germany", "DE", "France", "FR", "Italy", "IT", "Spain", "ES",
-    "United Kingdom", "UK", "Netherlands", "NL", "Belgium", "BE",
-    "USA", "US", "China", "CN", "Japan", "JP", "Korea", "KR"
-]
-
 VALID_CURRENCIES = ["SEK", "NOK", "EUR", "DKK", "DK", "sek", "nok", "eur", "dkk", "dk"]
 VALID_UNITS = ["ml", "g", "pcs", "st", "set", "kit", "pack"]
 
 # Regular expression patterns for validation
-EAN_PATTERN = re.compile(r'^\d{8}$|^\d{13}$')
-PRICE_PATTERN = re.compile(r'^\d+([,.]\d{1,2})?$')
 DATE_PATTERN = re.compile(r'^\d{4}-\d{2}-\d{2}( \d{2}:\d{2}:\d{2})?$')
-NUMERIC_PATTERN = re.compile(r'^\d+$')
-DISCOUNT_PATTERN = re.compile(r'^\d+([,.]\d{1,2})?%?$')
 HEX_COLOR_PATTERN = re.compile(r'^#[0-9a-fA-F]{6}$')
-UN_NUMBER_PATTERN = re.compile(r'^[0-9]{4}$')
+# Updated UN Number pattern to accept "UN" prefix
+UN_NUMBER_PATTERN = re.compile(r'^(UN)?\d{4}$')
 
 # Function to check if a value is numeric
 def is_numeric(val):
@@ -782,7 +765,7 @@ with st.sidebar:
         - **Top/Heart/Base Notes** - Enhances discovery and storytelling for perfumes. Useful in detailed product pages and guided shopping.
         """)
         
-        st.info("Upload an Excel file with product data for validation. The system checks that the information complies with NordicFeel’s specifications for product uploads.")
+        st.info("Upload an Excel file with product data for validation. The system checks that the information complies with NordicFeel's specifications for product uploads.")
 
 # File uploader
 uploaded_file = st.file_uploader("Upload Excel file (.xlsx)", type=["xlsx"])
@@ -952,15 +935,11 @@ if uploaded_file:
                         cell_issues[(idx, col)] = "green"
                         styled_row[col] = f"✅ {val}"
 
-                # EAN validation
+                # EAN validation - simplified to only check if empty
                 elif col == "EAN":
                     if not val:
                         cell_issues[(idx, col)] = "red"
                         styled_row[col] = "❌ EAN saknas"
-                        issue_count += 1
-                    elif not EAN_PATTERN.match(val):
-                        cell_issues[(idx, col)] = "red"
-                        styled_row[col] = "❌ EAN måste vara 8 eller 13 siffror"
                         issue_count += 1
                     else:
                         cell_issues[(idx, col)] = "green"
@@ -1017,7 +996,7 @@ if uploaded_file:
                         cell_issues[(idx, col)] = "green"
                         styled_row[col] = f"✅ {val}"
                         
-                # Product Name validation
+                # Product Name validation - removed capitalization check
                 elif col == "Product Name":
                     brand_val = str(row.get("Brand Name", "")).strip() if "Brand Name" in row else ""
                     
@@ -1027,10 +1006,6 @@ if uploaded_file:
                         issue_count += 1
                     else:
                         issues = []
-                        # Check for capitalization in product name
-                        words = val.split()
-                        if any(w[0].islower() for w in words if w):
-                            issues.append("Alla ord ska börja med stor bokstav")
                         
                         # Check for brand name in product name
                         if brand_val and brand_val.lower() in val.lower():
@@ -1052,17 +1027,13 @@ if uploaded_file:
                             cell_issues[(idx, col)] = "green"
                             styled_row[col] = f"✅ {val}"
 
-                # Product Name 2 validation
+                # Product Name 2 validation - removed capitalization check
                 elif col == "Product Name 2":
                     if not val:
                         cell_issues[(idx, col)] = "green"
                         styled_row[col] = "—"
                     else:
                         issues = []
-                        # Check for capitalization
-                        words = val.split()
-                        if any(w[0].islower() for w in words if w):
-                            issues.append("Alla ord ska börja med stor bokstav")
                         
                         # Check for abbreviations
                         if re.search(r'\b[A-Za-z]{1,2}\.\b', val):
@@ -1145,15 +1116,11 @@ if uploaded_file:
                         cell_issues[(idx, col)] = "green"
                         styled_row[col] = f"✅ {val}"
 
-                # Country of origin validation
+                # Country of origin validation - simplified to only check if empty
                 elif col == "Country of origin":
                     if not val:
                         cell_issues[(idx, col)] = "red"
                         styled_row[col] = "❌ Ursprungsland saknas"
-                        issue_count += 1
-                    elif val not in VALID_COUNTRIES:
-                        cell_issues[(idx, col)] = "yellow"
-                        styled_row[col] = "⚠️ Använd lands-kod eller fullständigt namn"
                         issue_count += 1
                     else:
                         cell_issues[(idx, col)] = "green"
@@ -1169,7 +1136,7 @@ if uploaded_file:
                     cell_issues[(idx, col)] = "green"
                     styled_row[col] = "—" if not val else f"✅ {val}"
                 
-                # UN Number validation
+                # UN Number validation - updated to accept UN prefix and handle Excel formatting
                 elif col == "UN Number":
                     if not val:
                         cell_issues[(idx, col)] = "green"
@@ -1178,13 +1145,13 @@ if uploaded_file:
                         cell_issues[(idx, col)] = "red"
                         styled_row[col] = "❌ Ta bort 'N/A' eller 'NA', lämna fältet tomt istället"
                         issue_count += 1
-                    elif not UN_NUMBER_PATTERN.match(val):
-                        cell_issues[(idx, col)] = "yellow"
-                        styled_row[col] = "⚠️ UN-nummer bör vara 4 siffror"
-                        issue_count += 1
-                    else:
+                    elif UN_NUMBER_PATTERN.match(val.replace(',', '')):
                         cell_issues[(idx, col)] = "green"
                         styled_row[col] = f"✅ {val}"
+                    else:
+                        cell_issues[(idx, col)] = "yellow"
+                        styled_row[col] = "⚠️ UN-nummer bör vara 4 siffror, eller 'UN' följt av 4 siffror"
+                        issue_count += 1
                 
                 # Flash-point validation
                 elif col == "Flash-point":
@@ -1199,15 +1166,11 @@ if uploaded_file:
                         cell_issues[(idx, col)] = "green"
                         styled_row[col] = f"✅ {val}"
 
-                # Gross Price validation
+                # Gross Price validation - simplified to only check if empty
                 elif col == "Gross Price":
                     if not val:
                         cell_issues[(idx, col)] = "red"
                         styled_row[col] = "❌ Pris saknas"
-                        issue_count += 1
-                    elif not PRICE_PATTERN.match(val.replace(' ', '')):
-                        cell_issues[(idx, col)] = "yellow"
-                        styled_row[col] = "⚠️ Ogiltigt prisformat"
                         issue_count += 1
                     else:
                         cell_issues[(idx, col)] = "green"
@@ -1227,43 +1190,31 @@ if uploaded_file:
                         cell_issues[(idx, col)] = "green"
                         styled_row[col] = f"✅ {val}"
                 
-                # Discount validation
+                # Discount validation - simplified to only check if empty
                 elif "discount" in col.lower():
                     if not val:
                         cell_issues[(idx, col)] = "red"
                         styled_row[col] = "❌ Rabatt saknas"
                         issue_count += 1
-                    elif not val.replace(",", ".").replace("%", "").strip().isdigit() and not is_numeric(val):
-                        cell_issues[(idx, col)] = "yellow"
-                        styled_row[col] = "⚠️ Ogiltigt rabattformat"
-                        issue_count += 1
                     else:
                         cell_issues[(idx, col)] = "green"
                         styled_row[col] = f"✅ {val}"
                 
-                # Net Purchasing Price validation
+                # Net Purchasing Price validation - simplified to only check if empty
                 elif col == "Net Purchasing Price":
                     if not val:
                         cell_issues[(idx, col)] = "red"
                         styled_row[col] = "❌ Nettopris saknas"
                         issue_count += 1
-                    elif not PRICE_PATTERN.match(val.replace(' ', '')):
-                        cell_issues[(idx, col)] = "yellow"
-                        styled_row[col] = "⚠️ Ogiltigt prisformat"
-                        issue_count += 1
                     else:
                         cell_issues[(idx, col)] = "green"
                         styled_row[col] = f"✅ {val}"
                 
-                # Sales Margin validations
+                # Sales Margin % validation - kept negative check, removed format validation
                 elif "sales margin %" in col.lower():
                     if not val:
                         cell_issues[(idx, col)] = "red"
                         styled_row[col] = "❌ Vinstmarginal saknas"
-                        issue_count += 1
-                    elif not val.replace(",", ".").replace("%", "").strip().replace("-", "").isdigit() and not is_numeric(val):
-                        cell_issues[(idx, col)] = "yellow"
-                        styled_row[col] = "⚠️ Ogiltigt marginalformat"
                         issue_count += 1
                     else:
                         # Check if margin is negative
@@ -1280,14 +1231,11 @@ if uploaded_file:
                             cell_issues[(idx, col)] = "green"
                             styled_row[col] = f"✅ {val}"
                 
+                # Sales Margin KR validation - kept negative check, removed format validation
                 elif "sales margin kr" in col.lower():
                     if not val:
                         cell_issues[(idx, col)] = "red"
                         styled_row[col] = "❌ Vinstmarginal i kronor saknas"
-                        issue_count += 1
-                    elif not is_numeric(val.replace(' ', '')):
-                        cell_issues[(idx, col)] = "yellow"
-                        styled_row[col] = "⚠️ Ogiltigt beloppsformat"
                         issue_count += 1
                     else:
                         # Check if margin is negative
@@ -1304,147 +1252,48 @@ if uploaded_file:
                             cell_issues[(idx, col)] = "green"
                             styled_row[col] = f"✅ {val}"
 
-                # RRP SEK validation
+                # RRP SEK validation - simplified to only check if empty
                 elif col.upper() in ["RRP SEK", "REC SEK"]:
                     if not val:
                         cell_issues[(idx, col)] = "red"
                         styled_row[col] = "❌ RRP SEK saknas"
                         issue_count += 1
-                    elif not PRICE_PATTERN.match(val.replace(' ', '')):
-                        cell_issues[(idx, col)] = "yellow"
-                        styled_row[col] = "⚠️ Ogiltigt prisformat"
-                        issue_count += 1
                     else:
-                        # Also check against Gross Price
-                        gross_col = "Gross Price"
-                        gross_val = str(row.get(gross_col, "")).strip() if gross_col in row else ""
-                        
-                        if gross_val and PRICE_PATTERN.match(gross_val.replace(' ', '')):
-                            try:
-                                gross_num = float(gross_val.replace(' ', '').replace(',', '.'))
-                                rec_num = float(val.replace(' ', '').replace(',', '.'))
-                                if gross_num > rec_num:
-                                    cell_issues[(idx, col)] = "yellow"
-                                    styled_row[col] = f"⚠️ Bruttopris ({gross_val}) högre än RRP ({val})"
-                                    issue_count += 1
-                                else:
-                                    cell_issues[(idx, col)] = "green"
-                                    styled_row[col] = f"✅ {val}"
-                            except ValueError:
-                                cell_issues[(idx, col)] = "green"
-                                styled_row[col] = f"✅ {val}"
-                        else:
-                            cell_issues[(idx, col)] = "green"
-                            styled_row[col] = f"✅ {val}"
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = f"✅ {val}"
                 
-                # RRP NOK validation
+                # RRP NOK validation - simplified to only check if empty
                 elif col.upper() in ["RRP NOK", "REC NOK"]:
                     if not val:
                         cell_issues[(idx, col)] = "green"
                         styled_row[col] = "—"
-                    elif not PRICE_PATTERN.match(val.replace(' ', '')):
-                        cell_issues[(idx, col)] = "yellow"
-                        styled_row[col] = "⚠️ Ogiltigt prisformat"
-                        issue_count += 1
                     else:
-                        # Check if reasonable compared to RRP SEK
-                        rec_sek_col = "RRP SEK" if "RRP SEK" in row else "REC SEK"
-                        rec_sek_val = str(row.get(rec_sek_col, "")).strip() if rec_sek_col in row else ""
-                        
-                        if rec_sek_val and PRICE_PATTERN.match(rec_sek_val.replace(' ', '')):
-                            try:
-                                rec_sek_num = float(rec_sek_val.replace(' ', '').replace(',', '.'))
-                                rec_nok_num = float(val.replace(' ', '').replace(',', '.'))
-                                # NOK is typically around 0.9-1.1 times SEK
-                                if rec_nok_num < rec_sek_num * 0.8 or rec_nok_num > rec_sek_num * 1.2:
-                                    cell_issues[(idx, col)] = "yellow"
-                                    styled_row[col] = f"⚠️ RRP NOK ({val}) verkar avvika från RRP SEK ({rec_sek_val})"
-                                    issue_count += 1
-                                else:
-                                    cell_issues[(idx, col)] = "green"
-                                    styled_row[col] = f"✅ {val}"
-                            except ValueError:
-                                cell_issues[(idx, col)] = "green"
-                                styled_row[col] = f"✅ {val}"
-                        else:
-                            cell_issues[(idx, col)] = "green"
-                            styled_row[col] = f"✅ {val}"
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = f"✅ {val}"
                 
-                # RRP EUR validation
+                # RRP EUR validation - simplified to only check if empty
                 elif col.upper() in ["RRP EUR", "REK EUR"]:
                     if not val:
                         cell_issues[(idx, col)] = "green"
                         styled_row[col] = "—"
-                    elif not PRICE_PATTERN.match(val.replace(' ', '')):
-                        cell_issues[(idx, col)] = "yellow"
-                        styled_row[col] = "⚠️ Ogiltigt prisformat"
-                        issue_count += 1
                     else:
-                        # Check if reasonable compared to RRP SEK
-                        rec_sek_col = "RRP SEK" if "RRP SEK" in row else "REC SEK"
-                        rec_sek_val = str(row.get(rec_sek_col, "")).strip() if rec_sek_col in row else ""
-                        
-                        if rec_sek_val and PRICE_PATTERN.match(rec_sek_val.replace(' ', '')):
-                            try:
-                                rec_sek_num = float(rec_sek_val.replace(' ', '').replace(',', '.'))
-                                rec_eur_num = float(val.replace(' ', '').replace(',', '.'))
-                                # EUR is typically around 0.08-0.1 times SEK
-                                if rec_eur_num < rec_sek_num * 0.07 or rec_eur_num > rec_sek_num * 0.12:
-                                    cell_issues[(idx, col)] = "yellow"
-                                    styled_row[col] = f"⚠️ RRP EUR ({val}) verkar avvika från RRP SEK ({rec_sek_val})"
-                                    issue_count += 1
-                                else:
-                                    cell_issues[(idx, col)] = "green"
-                                    styled_row[col] = f"✅ {val}"
-                            except ValueError:
-                                cell_issues[(idx, col)] = "green"
-                                styled_row[col] = f"✅ {val}"
-                        else:
-                            cell_issues[(idx, col)] = "green"
-                            styled_row[col] = f"✅ {val}"
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = f"✅ {val}"
                 
-                # RRP DKK validation
+                # RRP DKK validation - simplified to only check if empty
                 elif col.upper() in ["RRP DKK", "REK DK", "REK DKK"]:
                     if not val:
                         cell_issues[(idx, col)] = "green"
                         styled_row[col] = "—"
-                    elif not PRICE_PATTERN.match(val.replace(' ', '')):
-                        cell_issues[(idx, col)] = "yellow"
-                        styled_row[col] = "⚠️ Ogiltigt prisformat"
-                        issue_count += 1
                     else:
-                        # Check if reasonable compared to RRP SEK
-                        rec_sek_col = "RRP SEK" if "RRP SEK" in row else "REC SEK"
-                        rec_sek_val = str(row.get(rec_sek_col, "")).strip() if rec_sek_col in row else ""
-                        
-                        if rec_sek_val and PRICE_PATTERN.match(rec_sek_val.replace(' ', '')):
-                            try:
-                                rec_sek_num = float(rec_sek_val.replace(' ', '').replace(',', '.'))
-                                rec_dk_num = float(val.replace(' ', '').replace(',', '.'))
-                                # DKK is typically around 1.3-1.5 times SEK
-                                if rec_dk_num < rec_sek_num * 1.2 or rec_dk_num > rec_sek_num * 1.6:
-                                    cell_issues[(idx, col)] = "yellow"
-                                    styled_row[col] = f"⚠️ RRP DKK ({val}) verkar avvika från RRP SEK ({rec_sek_val})"
-                                    issue_count += 1
-                                else:
-                                    cell_issues[(idx, col)] = "green"
-                                    styled_row[col] = f"✅ {val}"
-                            except ValueError:
-                                cell_issues[(idx, col)] = "green"
-                                styled_row[col] = f"✅ {val}"
-                        else:
-                            cell_issues[(idx, col)] = "green"
-                            styled_row[col] = f"✅ {val}"
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = f"✅ {val}"
 
-                # Giftset Value validation
+                # Giftset Value validation - simplified to only check if empty
                 elif "giftset value" in col.lower():
                     if not val:
                         cell_issues[(idx, col)] = "green"
                         styled_row[col] = "—"
-                    elif not PRICE_PATTERN.match(val.replace(' ', '')):
-                        cell_issues[(idx, col)] = "yellow"
-                        styled_row[col] = "⚠️ Ogiltigt prisformat"
-                        issue_count += 1
                     else:
                         cell_issues[(idx, col)] = "green"
                         styled_row[col] = f"✅ {val}"
@@ -1821,7 +1670,7 @@ if uploaded_file:
                     use_container_width=True
                 )
         
-        # Statistics tab
+        # Statistics tab - reorganized as requested
         with tabs[2]:  # Statistics tab
             st.subheader("Statistics and Data Analysis")
             
@@ -1836,58 +1685,7 @@ if uploaded_file:
             col2.metric("Rows with Issues", rows_with_issues)
             col3.metric("Error Percentage", f"{error_percentage:.1f}%")
             
-            # Calculate category distributions
-            if "Main Category" in data.columns:
-                st.subheader("Category Distribution")
-                category_counts = data["Main Category"].value_counts()
-                st.bar_chart(category_counts)
-            
-            # Issue distribution by type
-            st.subheader("Most Common Issues")
-            issue_types = {}
-            for row in styled_summary_data:
-                for col, val in row.items():
-                    if val.startswith("❌") or val.startswith("⚠️"):
-                        issue_key = val.split("❌ ")[-1] if "❌ " in val else val.split("⚠️ ")[-1]
-                        issue_key = issue_key[:40] + "..." if len(issue_key) > 40 else issue_key
-                        issue_types.setdefault(issue_key, 0)
-                        issue_types[issue_key] += 1
-            
-            issue_df = pd.DataFrame({
-                "Issue": list(issue_types.keys()),
-                "Count": list(issue_types.values())
-            }).sort_values("Count", ascending=False)
-            
-            if not issue_df.empty:
-                if len(issue_df) > 10:
-                    issue_df = issue_df.head(10)
-                    st.info("Showing the 10 most common issues")
-                    
-                st.bar_chart(issue_df.set_index("Issue"))
-                
-                # Detailed issue table
-                st.subheader("Detailed Issue List")
-                st.dataframe(issue_df, use_container_width=True)
-            else:
-                st.success("No issues found in the file!")
-                
-            # Field completion statistics
-            st.subheader("Field Completion Rate")
-            
-            field_stats = {}
-            for col in data.columns:
-                non_empty = sum(1 for val in data[col] if pd.notna(val) and str(val).strip() not in ["", "nan", "none"])
-                completion_pct = (non_empty / total_rows * 100) if total_rows > 0 else 0
-                field_stats[col] = completion_pct
-                
-            field_stats_df = pd.DataFrame({
-                "Column": list(field_stats.keys()),
-                "Completion Rate (%)": list(field_stats.values())
-            }).sort_values("Completion Rate (%)", ascending=False)
-            
-            st.bar_chart(field_stats_df.set_index("Column"))
-            
-            # Field validation status
+            # 1. Validation Status per Column
             st.subheader("Validation Status per Column")
             
             field_validation = {}
@@ -1941,6 +1739,43 @@ if uploaded_file:
             # Display stacked bar chart
             if not pivot_df.empty:
                 st.bar_chart(pivot_df)
+                
+            # 2. Field Completion Rate
+            st.subheader("Field Completion Rate")
+            
+            field_stats = {}
+            for col in data.columns:
+                non_empty = sum(1 for val in data[col] if pd.notna(val) and str(val).strip() not in ["", "nan", "none"])
+                completion_pct = (non_empty / total_rows * 100) if total_rows > 0 else 0
+                field_stats[col] = completion_pct
+                
+            field_stats_df = pd.DataFrame({
+                "Column": list(field_stats.keys()),
+                "Completion Rate (%)": list(field_stats.values())
+            }).sort_values("Completion Rate (%)", ascending=False)
+            
+            st.bar_chart(field_stats_df.set_index("Column"))
+            
+            # 3. Detailed Issue List
+            st.subheader("Detailed Issue List")
+            issue_types = {}
+            for row in styled_summary_data:
+                for col, val in row.items():
+                    if val.startswith("❌") or val.startswith("⚠️"):
+                        issue_key = val.split("❌ ")[-1] if "❌ " in val else val.split("⚠️ ")[-1]
+                        issue_key = issue_key[:40] + "..." if len(issue_key) > 40 else issue_key
+                        issue_types.setdefault(issue_key, 0)
+                        issue_types[issue_key] += 1
+            
+            issue_df = pd.DataFrame({
+                "Issue": list(issue_types.keys()),
+                "Count": list(issue_types.values())
+            }).sort_values("Count", ascending=False)
+            
+            if not issue_df.empty:
+                st.dataframe(issue_df, use_container_width=True)
+            else:
+                st.success("No issues found in the file!")
                 
     except Exception as e:
         st.error(f"An error occurred: {e}")
