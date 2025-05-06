@@ -1561,19 +1561,28 @@ if uploaded_file:
                     return "background-color: #d4edda"
                 return ""
                 
-            # Create format dictionary for columns that need it
-            format_dict = {}
-            for col in df.columns:
-                if col in ["UN Number", "Gross Price", "Net Purchasing Price", "Discount (%)"]:
-                    format_dict[col] = '{:.0f}'  # No decimal places
-                elif "margin" in col.lower():
-                    format_dict[col] = '{:.1f}'  # One decimal place
-                
-            # Apply both highlighting and formatting
-            return df.style.apply(
-                lambda row: [highlight_cell(row[col], row.name, col) for col in df.columns],
-                axis=1
-            ).format(format_dict, na_rep="None")
+        # Define numeric columns that need formatting
+        numeric_columns = [
+            "Length of product package", "Width of product package", 
+            "Height of product package", "Weight", "UN Number", 
+            "Flash-point", "Gross Price", "Discount (%)", 
+            "Net Purchasing Price", "Sales Margin % SEK", 
+            "Sales Margin KR SEK", "RRP SEK", "RRP NOK", 
+            "RRP EUR", "RRP DKK", "Giftset Value SEK"
+        ]
+
+        # Create format dictionary for all numeric columns
+        format_dict = {}
+        for col in df.columns:
+            if col in numeric_columns or any(term in col for term in ["price", "margin", "discount", "rrp", "value"]):
+                # Format to 2 decimal places
+                format_dict[col] = '{:.2f}'
+            
+        # Apply both highlighting and formatting
+        return df.style.apply(
+            lambda row: [highlight_cell(row[col], row.name, col) for col in df.columns],
+            axis=1
+        ).format(format_dict, na_rep="None")
             
         # Display validation results tab
         with tabs[0]:  # Validation tab
