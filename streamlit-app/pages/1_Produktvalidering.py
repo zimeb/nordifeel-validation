@@ -636,8 +636,8 @@ VALID_UNITS = ["ml", "g", "pcs", "st", "set", "kit", "pack"]
 # Regular expression patterns for validation
 DATE_PATTERN = re.compile(r'^\d{4}-\d{2}-\d{2}( \d{2}:\d{2}:\d{2})?$')
 HEX_COLOR_PATTERN = re.compile(r'^#[0-9a-fA-F]{6}$')
-# Updated UN Number pattern to accept "UN" prefix
-UN_NUMBER_PATTERN = re.compile(r'^(UN)?\d{4}$')
+# Updated UN Number pattern to accept "UN" prefix and Excel comma-formatting
+UN_NUMBER_PATTERN = re.compile(r'^(UN)?(\d{1,2},\d{2}|\d{4})$', re.IGNORECASE)
 
 # Function to check if a value is numeric
 def is_numeric(val):
@@ -1145,7 +1145,7 @@ if uploaded_file:
                         cell_issues[(idx, col)] = "red"
                         styled_row[col] = "❌ Ta bort 'N/A' eller 'NA', lämna fältet tomt istället"
                         issue_count += 1
-                    elif UN_NUMBER_PATTERN.match(val.replace(',', '')):
+                    elif UN_NUMBER_PATTERN.match(val) or UN_NUMBER_PATTERN.match(val.replace(',', '')):
                         cell_issues[(idx, col)] = "green"
                         styled_row[col] = f"✅ {val}"
                     else:
