@@ -1598,6 +1598,10 @@ if uploaded_file:
                 lambda row: [highlight_cell(row[col], row.name, col) for col in df.columns],
                 axis=1
             )
+
+            # Format selected numeric columns to display 2 decimals
+            styled = styled.format({col: "{:.2f}" for col in numeric_columns if col in display_df.columns})
+
             return styled
             
         # Display validation results tab
