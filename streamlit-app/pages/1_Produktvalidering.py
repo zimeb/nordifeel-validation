@@ -1133,8 +1133,16 @@ if uploaded_file:
                 
                 # Manufacturer Information validation
                 elif "manufacturer information" in col.lower():
-                    cell_issues[(idx, col)] = "green"
-                    styled_row[col] = "—" if not val else f"✅ {val}"
+                    if not val:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = "—"
+                    elif INVALID_MANUFACTURER_PATTERN.match(val):
+                        cell_issues[(idx, col)] = "red"
+                        styled_row[col] = "❌ Lägg till korrekt tillverkare eller lämna fältet tomt"
+                        issue_count += 1
+                    else:
+                        cell_issues[(idx, col)] = "green"
+                        styled_row[col] = f"✅ {val}"
                 
                 # UN Number validation - updated to accept UN prefix and handle Excel formatting
                 elif col == "UN Number":
