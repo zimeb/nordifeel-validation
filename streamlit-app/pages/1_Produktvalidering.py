@@ -1550,8 +1550,8 @@ if uploaded_file:
             styled_summary_data.append(styled_row)
             
         # Function to style the dataframe with color-coded cells
-        def style_dataframe(df):
-            def highlight_cell(val, row_idx, col_name):
+            def style_dataframe(df):
+                def highlight_cell(val, row_idx, col_name):
                 color = cell_issues.get((row_idx, col_name))
                 if color == "red":
                     return "background-color: #ffcccc"
@@ -1560,7 +1560,7 @@ if uploaded_file:
                 elif color == "green":
                     return "background-color: #d4edda"
                 return ""
-                
+    
         # Define numeric columns that need formatting
         numeric_columns = [
             "Length of product package", "Width of product package", 
@@ -1570,14 +1570,14 @@ if uploaded_file:
             "Sales Margin KR SEK", "RRP SEK", "RRP NOK", 
             "RRP EUR", "RRP DKK", "Giftset Value SEK"
         ]
-
+    
         # Create format dictionary for all numeric columns
         format_dict = {}
         for col in df.columns:
             if col in numeric_columns or any(term in col for term in ["price", "margin", "discount", "rrp", "value"]):
                 # Format to 2 decimal places
                 format_dict[col] = '{:.2f}'
-            
+    
         # Apply both highlighting and formatting
         return df.style.apply(
             lambda row: [highlight_cell(row[col], row.name, col) for col in df.columns],
