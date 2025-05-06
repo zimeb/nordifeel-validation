@@ -1589,7 +1589,6 @@ if uploaded_file:
             lambda row: [highlight_cell(row[col], row.name, col) for col in df.columns],
             axis=1
         )
-
         return styled
             
         # Display validation results tab
