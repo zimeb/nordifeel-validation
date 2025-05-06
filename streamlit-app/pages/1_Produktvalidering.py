@@ -1561,10 +1561,19 @@ if uploaded_file:
                     return "background-color: #d4edda"
                 return ""
                 
+            # Create format dictionary for columns that need it
+            format_dict = {}
+            for col in df.columns:
+                if col in ["UN Number", "Gross Price", "Net Purchasing Price", "Discount (%)"]:
+                    format_dict[col] = '{:.0f}'  # No decimal places
+                elif "margin" in col.lower():
+                    format_dict[col] = '{:.1f}'  # One decimal place
+                
+            # Apply both highlighting and formatting
             return df.style.apply(
                 lambda row: [highlight_cell(row[col], row.name, col) for col in df.columns],
                 axis=1
-            )
+            ).format(format_dict, na_rep="None")
             
         # Display validation results tab
         with tabs[0]:  # Validation tab
