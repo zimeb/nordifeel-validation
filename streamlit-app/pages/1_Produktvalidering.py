@@ -1561,35 +1561,35 @@ if uploaded_file:
                     return "background-color: #d4edda"
                 return ""
     
-        # Create a copy of the dataframe for display formatting
-        display_df = df.copy()
+            # Create a copy of the dataframe for display formatting
+            display_df = df.copy()
     
-        # Format numeric columns to display only 2 decimal places
-        numeric_columns = [
-            "Length of product package", "Width of product package", 
-            "Height of product package", "Weight", "UN Number", 
-            "Flash-point", "Gross Price", "Discount (%)", 
-            "Net Purchasing Price", "Sales Margin % SEK", 
-            "Sales Margin KR SEK", "RRP SEK", "RRP NOK", 
-            "RRP EUR", "RRP DKK", "Giftset Value SEK"
-        ]
-    
-        # Try to convert numeric columns to proper numeric types for display
-        for col in df.columns:
-            if col in numeric_columns or any(term in str(col).lower() for term in ["price", "margin", "discount", "rrp", "value"]):
-                try:
-                    # Try to convert to numeric, ignore errors for non-numeric values
-                    display_df[col] = pd.to_numeric(display_df[col], errors='ignore')
-                except:
-                    # If conversion fails, leave it as is
-                    pass
-    
-        # Apply highlighting to the display dataframe
-        styled = display_df.style.apply(
-            lambda row: [highlight_cell(row[col], row.name, col) for col in df.columns],
-            axis=1
-        )
-        return styled
+            # Format numeric columns to display only 2 decimal places
+            numeric_columns = [
+                "Length of product package", "Width of product package", 
+                "Height of product package", "Weight", "UN Number", 
+                "Flash-point", "Gross Price", "Discount (%)", 
+                "Net Purchasing Price", "Sales Margin % SEK", 
+                "Sales Margin KR SEK", "RRP SEK", "RRP NOK", 
+                "RRP EUR", "RRP DKK", "Giftset Value SEK"
+            ]
+        
+            # Try to convert numeric columns to proper numeric types for display
+            for col in df.columns:
+                if col in numeric_columns or any(term in str(col).lower() for term in ["price", "margin", "discount", "rrp", "value"]):
+                    try:
+                        # Try to convert to numeric, ignore errors for non-numeric values
+                        display_df[col] = pd.to_numeric(display_df[col], errors='ignore')
+                    except:
+                        # If conversion fails, leave it as is
+                        pass
+        
+            # Apply highlighting to the display dataframe
+            styled = display_df.style.apply(
+                lambda row: [highlight_cell(row[col], row.name, col) for col in df.columns],
+                axis=1
+            )
+            return styled
             
         # Display validation results tab
         with tabs[0]:  # Validation tab
