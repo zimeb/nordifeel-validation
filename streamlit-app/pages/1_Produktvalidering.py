@@ -1681,7 +1681,45 @@ if uploaded_file:
                         elif val.startswith("❌"):
                             return "background-color: #f8d7da"
                     return ""
-                return df.style.applymap(get_style)
+    
+                # Format numeric columns with 2 decimal places
+                display_df = df.copy()
+                # Replace NaN values with dash
+                display_df = display_df.fillna("—")
+    
+                # Format numeric columns
+                number_terms = ["price", "margin", "discount", "rrp", "value", "cost", 
+                               "rate", "fee", "weight", "height", "width", "length"]
+    
+                # Format function for numeric values
+                def format_numeric(val):
+                    if pd.isna(val) or val == "" or val == "—":
+                        return "—"
+        
+                    # Check if the value appears to be numeric
+                    try:
+                        if isinstance(val, str) and (val.startswith("✅") or val.startswith("⚠️") or val.startswith("❌")):
+                            return val
+                
+                        # Try to convert to float and format with 2 decimal places
+                        cleaned_val = str(val).replace(',', '.').replace(' ', '')
+                        if cleaned_val.lower() in ["nan", "none", ""]:
+                            return "—"
+                
+                        num_val = float(cleaned_val)
+                        # Format with 2 decimal places
+                        return "{:.2f}".format(num_val) if not isinstance(val, str) or not (val.startswith("✅") or val.startswith("⚠️") or val.startswith("❌")) else val
+                    except (ValueError, TypeError):
+                        # If it can't be converted to float, return as is
+                        return val
+    
+                # Apply numeric formatting to columns that likely contain numbers
+                for col in display_df.columns:
+                    if any(term in str(col).lower() for term in number_terms):
+                        display_df[col] = display_df[col].apply(format_numeric)
+    
+                # Apply cell styling
+                return display_df.style.applymap(get_style)
 
             st.dataframe(style_summary(merged), use_container_width=True, height=400)
 
