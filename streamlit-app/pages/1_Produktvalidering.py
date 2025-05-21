@@ -1572,40 +1572,58 @@ if uploaded_file:
     
             # Create a copy of the dataframe for display formatting
             display_df = df.copy()
+        
+            # Replace NaN values with a dash in the display dataframe
+            display_df = display_df.fillna("—")
     
-            # Format numeric columns to display only 2 decimal places
+            # Define numeric columns that should have 2 decimal places
             numeric_columns = [
                 "Length of product package", "Width of product package", 
-                "Height of product package", "Weight", 
-                "Flash-point", "Gross Price", "Discount (%)", 
-                "Net Purchasing Price", "Sales Margin % SEK", 
-                "Sales Margin KR SEK", "RRP SEK", "RRP NOK", 
-                "RRP EUR", "RRP DKK", "Giftset Value SEK"
+                "Height of product package", "Weight", "Flash-point", 
+                "Gross Price", "Discount (%)", "Net Purchasing Price", 
+                "Sales Margin % SEK", "Sales Margin KR SEK", "RRP SEK", 
+                "RRP NOK", "RRP EUR", "RRP DKK", "Giftset Value SEK"
             ]
-
+            
+            # Add more number-like columns to be formatted
+            number_terms = ["price", "margin", "discount", "rrp", "value", "cost", 
+                            "rate", "fee", "weight", "height", "width", "length"]
+        
             # Format function that handles both numeric and non-numeric values
             def format_value(val, col):
-                if col in numeric_columns or any(term in str(col).lower() for term in ["price", "margin", "discount", "rrp", "value"]):
+                if val == "—" or val == "" or pd.isna(val):
+                    return "—"
+                    
+                # Check if this column should be formatted as numeric
+                is_numeric_col = (col in numeric_columns or 
+                                 any(term in str(col).lower() for term in number_terms))
+                                 
+                if is_numeric_col:
                     try:
-                        # Try to convert to float and format with 2 decimal places
-                        return "{:.2f}".format(float(str(val).replace(',', '.').replace(' ', '')))
+                        # Clean the value string and try to convert to float
+                        cleaned_val = str(val).replace(',', '.').replace(' ', '')
+                        if cleaned_val.lower() in ["nan", "none", ""]:
+                            return "—"
+                            
+                        num_val = float(cleaned_val)
+                        # Format with 2 decimal places
+                        return "{:.2f}".format(num_val)
                     except (ValueError, TypeError):
                         # If it can't be converted to float, return as is
                         return val
                 # For non-numeric columns, return value as is
                 return val
         
-            # Apply formatting to each cell before styling
+            # Apply formatting to each cell in the dataframe
             for col in display_df.columns:
-                if col in numeric_columns or any(term in str(col).lower() for term in ["price", "margin", "discount", "rrp", "value"]):
-                    display_df[col] = display_df[col].apply(lambda x: format_value(x, col))
-        
+                display_df[col] = display_df[col].apply(lambda x: format_value(x, col))
+    
             # Apply highlighting to the display dataframe
             styled = display_df.style.apply(
                 lambda row: [highlight_cell(row[col], row.name, col) for col in df.columns],
                 axis=1
             )
-
+    
             return styled
             
         # Display validation results tab
