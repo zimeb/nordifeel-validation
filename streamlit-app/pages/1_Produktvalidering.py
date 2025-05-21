@@ -1721,6 +1721,8 @@ if uploaded_file:
                 # Apply cell styling
                 return display_df.style.applymap(get_style)
 
+            # Round numeric values to 2 decimal places
+            merged = merged.round(2)
             st.dataframe(style_summary(merged), use_container_width=True, height=400)
 
             # Add EAN list for easy copying
