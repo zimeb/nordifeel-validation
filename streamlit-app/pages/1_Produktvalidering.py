@@ -1598,7 +1598,7 @@ if uploaded_file:
             # Apply formatting to each cell before styling
             for col in display_df.columns:
                 if col in numeric_columns or any(term in str(col).lower() for term in ["price", "margin", "discount", "rrp", "value"]):
-                display_df[col] = display_df[col].apply(lambda x: format_value(x, col))
+                    display_df[col] = display_df[col].apply(lambda x: format_value(x, col))
         
             # Apply highlighting to the display dataframe
             styled = display_df.style.apply(
