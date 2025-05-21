@@ -1576,31 +1576,35 @@ if uploaded_file:
             # Format numeric columns to display only 2 decimal places
             numeric_columns = [
                 "Length of product package", "Width of product package", 
-                "Height of product package", "Weight", "UN Number", 
+                "Height of product package", "Weight", 
                 "Flash-point", "Gross Price", "Discount (%)", 
                 "Net Purchasing Price", "Sales Margin % SEK", 
                 "Sales Margin KR SEK", "RRP SEK", "RRP NOK", 
                 "RRP EUR", "RRP DKK", "Giftset Value SEK"
             ]
-        
-            # Try to convert numeric columns to proper numeric types for display
-            for col in df.columns:
+
+            # Format function that handles both numeric and non-numeric values
+            def format_value(val, col):
                 if col in numeric_columns or any(term in str(col).lower() for term in ["price", "margin", "discount", "rrp", "value"]):
                     try:
-                        # Try to convert to numeric, ignore errors for non-numeric values
-                        display_df[col] = pd.to_numeric(display_df[col], errors='ignore')
-                    except:
-                        # If conversion fails, leave it as is
-                        pass
+                        # Try to convert to float and format with 2 decimal places
+                        return "{:.2f}".format(float(str(val).replace(',', '.').replace(' ', '')))
+                    except (ValueError, TypeError):
+                        # If it can't be converted to float, return as is
+                        return val
+                # For non-numeric columns, return value as is
+                return val
+        
+            # Apply formatting to each cell before styling
+            for col in display_df.columns:
+                if col in numeric_columns or any(term in str(col).lower() for term in ["price", "margin", "discount", "rrp", "value"]):
+                display_df[col] = display_df[col].apply(lambda x: format_value(x, col))
         
             # Apply highlighting to the display dataframe
             styled = display_df.style.apply(
                 lambda row: [highlight_cell(row[col], row.name, col) for col in df.columns],
                 axis=1
             )
-
-            # Format selected numeric columns to display 2 decimals
-            styled = styled.format({col: "{:.2f}" for col in numeric_columns if col in display_df.columns})
 
             return styled
             
