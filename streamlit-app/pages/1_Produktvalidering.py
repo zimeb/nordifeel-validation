@@ -1660,6 +1660,13 @@ if uploaded_file:
             # Merge summary with detailed validation
             merged = pd.concat([summary_df, detail_df], axis=1)
             merged = merged.loc[:, ~merged.columns.duplicated()]
+            # Round numeric columns to 2 decimal places
+            for col in merged.columns:
+                if merged[col].dtype in ['float64', 'float32', 'int64', 'int32']:
+                    try:
+                        merged[col] = merged[col].round(2)
+                    except:
+                        pass
             
             # Apply filter based on sidebar selection
             if filter_by == "Only with errors":
