@@ -1708,7 +1708,7 @@ if uploaded_file:
                 
                         num_val = float(cleaned_val)
                         # Format with 2 decimal places
-                        return "{:.2f}".format(num_val) if not isinstance(val, str) or not (val.startswith("✅") or val.startswith("⚠️") or val.startswith("❌")) else val
+                        return "{:.2f}".format(num_val)
                     except (ValueError, TypeError):
                         # If it can't be converted to float, return as is
                         return val
