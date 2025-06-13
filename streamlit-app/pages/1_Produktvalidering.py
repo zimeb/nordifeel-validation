@@ -1875,9 +1875,9 @@ else:
         - Sales Margin KR
         - RRP SEK
         
-        ### Critical Columns, if applicable
+        ### Critical Columns (if applicable)
 
-        **If these columns are relevant for your products, it's critical that they are filled in correctly from the start..**
+        **If these columns are relevant for your products, it's critical that they are filled in correctly from the start.**
         
         - If Relaunch, Enter Old EAN
         - Launch Date
