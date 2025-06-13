@@ -1860,9 +1860,7 @@ else:
         
         ### Critical Columns (must be filled in with correct information from the start)
 
-        **These fields are required to register and order the product. 
-        
-        We cannot process any products with missing information in the critical fields.**
+        **Required to register and order the product. We cannot process any files with missing information in critical fields.**
         
         - Categories
         - EAN
