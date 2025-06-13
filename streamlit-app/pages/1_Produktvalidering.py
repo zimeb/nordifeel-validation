@@ -1848,8 +1848,13 @@ else:
     with st.expander("📋 View Column Explanations", expanded=False):
         st.markdown("""
 
+         ### First, let’s start with the basics
+        Providing proper product data is one of the easiest and most effective ways to improve the performance of your products. When your data is accurate and complete, products are processed faster, become easier to find on the site, and are prioritized in search, filters, and recommendation algorithms.
+
+        ✅ Always use the latest version of our product template – NordicFeel Product Template v.2025-04-30
+
         We strongly encourage you to submit complete and correct product data from the start, as this significantly reduces the risk of errors and ensures your product gets the best possible placement on site. 
-        Incomplete submissions often delay launch and increase the risk of incorrect product listings. We cannot guarantee that the product data will be corrected at a later stage if required fields are missing in the initial submission. 
+        Incomplete submissions often delay launch and increase the risk of incorrect product listings. **We cannot guarantee that the product data will be corrected at a later stage if required fields are missing in the initial submission.**
         
         ### Critical Columns (must be filled in with correct information from the start)
 
