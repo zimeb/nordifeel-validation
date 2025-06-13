@@ -695,75 +695,6 @@ with st.sidebar:
     st.divider()
     
     with st.expander("⚙️ Show instructions", expanded=False):
-        st.markdown("""
-        ### Critical Columns (must be filled in)
-        
-        - **Main Category** - Helps customers find your product and increases visibility in filters and recommendations.
-        - **Secondary Category** - Same as above. Be as specific as possible, but only select what is truly relevant.
-        - **EAN** - 8 or 13 digits. Required to list and track the product in our systems.
-        - **Brand Name** - Displayed across site. Must be correct and final from the start.
-        - **Product Name** - This is the name customers will see on-site and in search results. It must be final and correctly formatted, as we publish exactly what you enter here — no internal corrections or adjustments are made. A clear, accurate name is essential for product presentation, customer trust, and overall sales performance.
-        - **Gross Price** - Base for pricing calculations and margin setup.
-        - **Currency** - Must match the pricing data you provide.
-        - **Discount (%)** - Used to calculate your net purchasing price.
-        - **Net Purchasing Price** - Calculated field (Gross Price - Discount).
-        - **Sales Margin %** - Calculated from price data.
-        - **Sales Margin KR** - Calculated from price data.
-        - **Country of origin** - Required for customs and legal compliance.
-        - **RRP SEK** - Customer-facing sales price. Displayed on site.
-        
-        ### Critical Columns (if applicable)
-        
-        - **If Relaunch, Enter Old EAN** - If this product is a renovation or replacement of an existing item, it's essential that you provide the previous EAN. This allows us to link the new product to the same article number and retain valuable data like historical sales, reviews, customer behavior, and order forecasts. Without this, the product is treated as completely new — which means our systems (and customers) have to "relearn" it from scratch, resulting in slower ramp-up and lost sales opportunities.
-        - **Launch Date** - Use if you want to control the product's go-live date. If left blank, the product will be launched immediately once in stock.
-        - **Purchasing Date** - If you want to control when we can start purchase the product. If left blank, we will purchase it immediately once registered.
-        - **UN Number** - Mandatory for hazardous goods. Supplier must provide this if relevant.
-        - **Flash-point** - Mandatory for hazardous goods. Supplier must provide this if relevant.
-        
-        ### Important Columns (but not critical)
-        
-        - **Third Category** - Improves product visibility and navigation on-site. Fill in to the extent possible as relevant.
-        - **Size** - Displayed in filters and on product pages (e.g. 30, 50, 100).
-        - **Unit/Volume** - Clarifies product size. Used with the number in "Size".
-        - **Length/Width/Height of product package** - Used for shipping and storage setup.
-        - **Weight** - Used for shipping and storage setup.
-        - **Customs Code / STAT.no** - Used for customs classification. We can add if missing.
-        - **Manufacturer Information** - Important (will become critical under EU law). Must be the GPSR-responsible company. Required for upcoming EU regulations.
-        - **Giftset Value SEK** - Important if applicable. Required for gift sets or value packs to reflect bundle value.
-        - **Product Text (all languages)** - Important but not critical at this stage. A good, descriptive product text increases customer trust and drives sales. Can be left empty at this stage if you will send it later or we can retrieve it from a supplier portal.
-        - **How To Use (all languages)** - Important but not critical at this stage. Helps customers use the product correctly, reduces returns, and builds brand trust. Can be left empty at this stage if you will send it later or we can retrieve it from a supplier portal.
-        - **Safety Information Use (all languages)** - Important (will become critical). Required for GPSR compliance.
-        - **INCI** - Critical for transparency and compliance. Can be left empty at this stage if you will send it later or we can retrieve it from a supplier portal.
-        
-        ### Optional Columns
-        
-        - **Fourth Category** - Adds filtering depth if relevant. Only fill in if it makes sense for the product.
-        - **Vendor Item Number** - Helps match SKUs across systems.
-        - **Product Name 2** - Useful for distinguishing between similar products, especially variants like shades, scents, or formats. Helps customers easily identify the right version and improves clarity on product pages. Do not include brand name or volume. Avoid abbreviations, and capitalize each word for consistency and readability.
-        - **Units (minimum/D-pack/per pallet/per pallet layer)** - Supports logistics and order planning.
-        - **RRP NOK/EUR/DKK** - We'll convert from SEK if left blank.
-        - **SEO Keywords** - Improves product discoverability in search and SEO.
-        - **Hex Color Code** - Helps visually match color cosmetics or packaging. Improves product filtering and visibility.
-        
-        ### Attribute Columns (recommended if relevant)
-        
-        These columns improve product discoverability, filtering, and recommendation precision:
-        
-        - **Gender** - Used in filters and helps us recommend the product more effectively to the right audience.
-        - **SPF** - Important for skincare and sun protection categories. Improves filtering and recommendation precision.
-        - **Color** - Displayed on product pages and filters. Helps customers compare and find matching shades.
-        - **Finish** - Relevant for makeup. Improves discoverability through filters and recommendations.
-        - **Coverage** - Used for foundations, concealers, and BB creams. Helps the right customers find the right level of coverage.
-        - **Product Type** - Supports site navigation, filters, and search. Improves product matching and cross-selling.
-        - **Sustainable Beauty** - Used in filters and badges to promote eco-conscious choices. Boosts visibility for customers who shop by values.
-        - **Active Ingredients** - Key for product discovery and trust. Helps us highlight benefits and connect to search terms like "Vitamin C" or "Retinol."
-        - **Skin Type** - Used in filters and recommendations. Helps customers find suitable products based on their skin needs.
-        - **Skin Condition** - Improves targeting for specific concerns (e.g., acne, dryness). Helps customers find the right solutions.
-        - **Trait** - Describes additional benefits (e.g., hydrating, volumizing). Supports filters and recommendation accuracy.
-        - **Hair Type** - Used in recommendations and filters to guide the right product to the right user.
-        - **Fragrance Family** - Improves discoverability in scent categories. Helps group similar products and refine recommendations.
-        - **Top/Heart/Base Notes** - Enhances discovery and storytelling for perfumes. Useful in detailed product pages and guided shopping.
-        """)
         
         st.info("Upload an Excel file with product data for validation. The system checks that the information complies with NordicFeel's specifications for product uploads.")
 
@@ -1916,73 +1847,45 @@ else:
     # Display file structure requirements
     with st.expander("📋 View Column Explanations", expanded=False):
         st.markdown("""
-        ### Critical Columns (must be filled in)
         
-        - **Main Category** - Helps customers find your product and increases visibility in filters and recommendations.
-        - **Secondary Category** - Same as above. Be as specific as possible, but only select what is truly relevant.
-        - **EAN** - 8 or 13 digits. Required to list and track the product in our systems.
-        - **Brand Name** - Displayed across site. Must be correct and final from the start.
-        - **Product Name** - This is the name customers will see on-site and in search results. It must be final and correctly formatted, as we publish exactly what you enter here — no internal corrections or adjustments are made. A clear, accurate name is essential for product presentation, customer trust, and overall sales performance.
-        - **Gross Price** - Base for pricing calculations and margin setup.
-        - **Currency** - Must match the pricing data you provide.
-        - **Discount (%)** - Used to calculate your net purchasing price.
-        - **Net Purchasing Price** - Calculated field (Gross Price - Discount).
-        - **Sales Margin %** - Calculated from price data.
-        - **Sales Margin KR** - Calculated from price data.
-        - **Country of origin** - Required for customs and legal compliance.
-        - **RRP SEK** - Customer-facing sales price. Displayed on site.
+        ### Critical Columns (must be filled in with correct information from the start)
+
+        **These fields are required to register and order the product. We cannot process any products with missing information in the critical fields.**
         
-        ### Critical Columns (if applicable)
+        - Categories
+        - EAN
+        - Brand Name
+        - Product Name
+        - Country of origin
+        - Gross Price
+        - Currency
+        - Discount (%)
+        - Net Purchasing Price
+        - Sales Margin %
+        - Sales Margin KR
+        - RRP SEK
         
-        - **If Relaunch, Enter Old EAN** - If this product is a renovation or replacement of an existing item, it's essential that you provide the previous EAN. This allows us to link the new product to the same article number and retain valuable data like historical sales, reviews, customer behavior, and order forecasts. Without this, the product is treated as completely new — which means our systems (and customers) have to "relearn" it from scratch, resulting in slower ramp-up and lost sales opportunities.
-        - **Launch Date** - Use if you want to control the product's go-live date. If left blank, the product will be launched immediately once in stock.
-        - **Purchasing Date** - If you want to control when we can start purchase the product. If left blank, we will purchase it immediately once registered.
-        - **UN Number** - Mandatory for hazardous goods. Supplier must provide this if relevant.
-        - **Flash-point** - Mandatory for hazardous goods. Supplier must provide this if relevant.
+        ### Critical Columns, if applicable
+
+        **Same as the above, if these columns are relevant for your products it is cricical that they are filled in with correct information from the start.**
         
-        ### Important Columns (but not critical)
+        - If Relaunch, Enter Old EAN
+        - Launch Date
+        - Purchasing Date
+        - UN Number
+        - Flash-point
         
-        - **Third Category** - Improves product visibility and navigation on-site. Fill in to the extent possible as relevant.
-        - **Size** - Displayed in filters and on product pages (e.g. 30, 50, 100).
-        - **Unit/Volume** - Clarifies product size. Used with the number in "Size".
-        - **Length/Width/Height of product package** - Used for shipping and storage setup.
-        - **Weight** - Used for shipping and storage setup.
-        - **Customs Code / STAT.no** - Used for customs classification. We can add if missing.
-        - **Manufacturer Information** - Important (will become critical under EU law). Must be the GPSR-responsible company. Required for upcoming EU regulations.
-        - **Giftset Value SEK** - Important if applicable. Required for gift sets or value packs to reflect bundle value.
-        - **Product Text (all languages)** - Important but not critical at this stage. A good, descriptive product text increases customer trust and drives sales. Can be left empty at this stage if you will send it later or we can retrieve it from a supplier portal.
-        - **How To Use (all languages)** - Important but not critical at this stage. Helps customers use the product correctly, reduces returns, and builds brand trust. Can be left empty at this stage if you will send it later or we can retrieve it from a supplier portal.
-        - **Safety Information Use (all languages)** - Important (will become critical). Required for GPSR compliance.
-        - **INCI** - Critical for transparency and compliance. Can be left empty at this stage if you will send it later or we can retrieve it from a supplier portal.
+        ### Required Columns 
         
-        ### Optional Columns
+        **These are required for full product setup and before the product launch on site.**
         
-        - **Fourth Category** - Adds filtering depth if relevant. Only fill in if it makes sense for the product.
-        - **Vendor Item Number** - Helps match SKUs across systems.
-        - **Product Name 2** - Useful for distinguishing between similar products, especially variants like shades, scents, or formats. Helps customers easily identify the right version and improves clarity on product pages. Do not include brand name or volume. Avoid abbreviations, and capitalize each word for consistency and readability.
-        - **Units (minimum/D-pack/per pallet/per pallet layer)** - Supports logistics and order planning.
-        - **RRP NOK/EUR/DKK** - We'll convert from SEK if left blank.
-        - **SEO Keywords** - Improves product discoverability in search and SEO.
-        - **Hex Color Code** - Helps visually match color cosmetics or packaging. Improves product filtering and visibility.
-        
-        ### Attribute Columns (recommended if relevant)
-        
-        These columns improve product discoverability, filtering, and recommendation precision:
-        
-        - **Gender** - Used in filters and helps us recommend the product more effectively to the right audience.
-        - **SPF** - Important for skincare and sun protection categories. Improves filtering and recommendation precision.
-        - **Color** - Displayed on product pages and filters. Helps customers compare and find matching shades.
-        - **Finish** - Relevant for makeup. Improves discoverability through filters and recommendations.
-        - **Coverage** - Used for foundations, concealers, and BB creams. Helps the right customers find the right level of coverage.
-        - **Product Type** - Supports site navigation, filters, and search. Improves product matching and cross-selling.
-        - **Sustainable Beauty** - Used in filters and badges to promote eco-conscious choices. Boosts visibility for customers who shop by values.
-        - **Active Ingredients** - Key for product discovery and trust. Helps us highlight benefits and connect to search terms like "Vitamin C" or "Retinol."
-        - **Skin Type** - Used in filters and recommendations. Helps customers find suitable products based on their skin needs.
-        - **Skin Condition** - Improves targeting for specific concerns (e.g., acne, dryness). Helps customers find the right solutions.
-        - **Trait** - Describes additional benefits (e.g., hydrating, volumizing). Supports filters and recommendation accuracy.
-        - **Hair Type** - Used in recommendations and filters to guide the right product to the right user.
-        - **Fragrance Family** - Improves discoverability in scent categories. Helps group similar products and refine recommendations.
-        - **Top/Heart/Base Notes** - Enhances discovery and storytelling for perfumes. Useful in detailed product pages and guided shopping.
+        - Limited Edition
+        - Size & Unit/Volume
+        - Logistics & Packaging
+        - Customs Code / STAT.no – 10 digits
+        - Manufacturer Information – Name, Postal Address, Email
+        - Product Attributes – If relevant for the category
+        - Fragrance Profile – If relevant (e.g., perfumes, scented products)
         """)
 
         st.info("For more details, see the documentation from NordicFeel about product uploads.")
